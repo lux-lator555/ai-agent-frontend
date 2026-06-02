@@ -97,9 +97,11 @@ export default function App() {
               {result.rows} rows · {result.columns} columns · {result.turns} agent turns
             </p>
 
-            <h3 style={styles.sectionTitle}>Summary</h3>
+            {/* Technical Analysis */}
+            <h3 style={styles.sectionTitle}>Technical Analysis</h3>
             <p style={styles.summary}>{result.summary}</p>
 
+            {/* Charts */}
             {result.charts && result.charts.length > 0 && (
               <div>
                 <h3 style={styles.sectionTitle}>Charts</h3>
@@ -111,6 +113,18 @@ export default function App() {
                     style={styles.chart}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Business Recommendations */}
+            {result.recommendations && (
+              <div style={styles.recommendationsCard}>
+                <h3 style={styles.recommendationsTitle}>
+                  💡 Business Recommendations
+                </h3>
+                <p style={styles.recommendations}>
+                  {result.recommendations}
+                </p>
               </div>
             )}
           </div>
@@ -228,6 +242,7 @@ const styles = {
     color: "#cbd5e1",
     fontSize: "16px",
     marginBottom: "12px",
+    marginTop: "24px",
   },
   summary: {
     color: "#94a3b8",
@@ -240,5 +255,23 @@ const styles = {
     borderRadius: "8px",
     marginBottom: "16px",
     border: "1px solid #334155",
+  },
+  recommendationsCard: {
+    marginTop: "32px",
+    backgroundColor: "#0f172a",
+    borderRadius: "12px",
+    padding: "24px",
+    border: "1px solid #6366f1",
+  },
+  recommendationsTitle: {
+    color: "#6366f1",
+    fontSize: "18px",
+    marginBottom: "16px",
+  },
+  recommendations: {
+    color: "#94a3b8",
+    fontSize: "14px",
+    lineHeight: "1.8",
+    whiteSpace: "pre-wrap",
   },
 };
