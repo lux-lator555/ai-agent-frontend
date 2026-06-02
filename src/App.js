@@ -41,6 +41,12 @@ export default function App() {
     }
   };
 
+  const cleanSummary = (text) => {
+    if (!text) return "";
+    // Remove code blocks
+    return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -99,7 +105,7 @@ export default function App() {
 
             {/* Technical Analysis */}
             <h3 style={styles.sectionTitle}>Technical Analysis</h3>
-            <p style={styles.summary}>{result.summary}</p>
+            <p style={styles.summary}>{cleanSummary(result.summary)}</p>
 
             {/* Charts */}
             {result.charts && result.charts.length > 0 && (
