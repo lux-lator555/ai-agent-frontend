@@ -13,7 +13,11 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const resultsRef = useRef(null);
+  const chatBottomRef = useRef(null);
 
   const handleAnalyze = async () => {
     if (!file || !goal || !apiKey) {
@@ -24,6 +28,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setChatHistory([]);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -43,6 +48,51 @@ export default function App() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFollowUp = async () => {
+    if (!chatInput.trim() || !result) return;
+
+    const question = chatInput.trim();
+    setChatInput("");
+    setChatLoading(true);
+
+    const newHistory = [...chatHistory, { role: "user", content: question }];
+    setChatHistory(newHistory);
+
+    try {
+      const response = await fetch(`${RENDER_URL}/followup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          original_summary: result.summary,
+          original_recommendations: result.recommendations,
+          conversation_history: chatHistory,
+          api_key: apiKey,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Server error — please try again.");
+      const data = await response.json();
+
+      setChatHistory([
+        ...newHistory,
+        { role: "assistant", content: data.response },
+      ]);
+
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+
+    } catch (err) {
+      setChatHistory([
+        ...newHistory,
+        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+      ]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -195,6 +245,60 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Chat Section */}
+            <div style={styles.chatContainer}>
+              <h3 style={styles.chatTitle}>💬 Ask a Follow-Up Question</h3>
+              <p style={styles.chatSubtitle}>
+                Ask anything about the analysis, request clarification, or explore what-if scenarios.
+              </p>
+
+              {/* Chat History */}
+              {chatHistory.length > 0 && (
+                <div style={styles.chatHistory}>
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      style={msg.role === "user" ? styles.userBubble : styles.agentBubble}
+                    >
+                      <div style={styles.bubbleLabel}>
+                        {msg.role === "user" ? "You" : "🤖 Agent"}
+                      </div>
+                      <div style={styles.markdownBody}>
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={styles.agentBubble}>
+                      <div style={styles.bubbleLabel}>🤖 Agent</div>
+                      <p style={styles.thinking}>Thinking...</p>
+                    </div>
+                  )}
+                  <div ref={chatBottomRef} />
+                </div>
+              )}
+
+              {/* Chat Input */}
+              <div style={styles.chatInputRow}>
+                <input
+                  type="text"
+                  placeholder="e.g. Which customers should we contact first?"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleFollowUp()}
+                  style={styles.chatInput}
+                  disabled={chatLoading}
+                />
+                <button
+                  onClick={handleFollowUp}
+                  disabled={chatLoading || !chatInput.trim()}
+                  style={chatLoading || !chatInput.trim() ? styles.sendButtonDisabled : styles.sendButton}
+                >
+                  Send
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -364,5 +468,86 @@ const styles = {
     fontSize: "18px",
     marginBottom: "16px",
     fontWeight: "600",
+  },
+  chatContainer: {
+    marginTop: "32px",
+    borderTop: "1px solid #334155",
+    paddingTop: "24px",
+  },
+  chatTitle: {
+    color: "#f8fafc",
+    fontSize: "18px",
+    marginBottom: "8px",
+  },
+  chatSubtitle: {
+    color: "#64748b",
+    fontSize: "13px",
+    marginBottom: "16px",
+  },
+  chatHistory: {
+    marginBottom: "16px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+  },
+  userBubble: {
+    backgroundColor: "#334155",
+    borderRadius: "12px",
+    padding: "12px 16px",
+    alignSelf: "flex-end",
+    maxWidth: "85%",
+    marginLeft: "auto",
+  },
+  agentBubble: {
+    backgroundColor: "#0f172a",
+    borderRadius: "12px",
+    padding: "12px 16px",
+    border: "1px solid #334155",
+    maxWidth: "95%",
+  },
+  bubbleLabel: {
+    fontSize: "11px",
+    color: "#64748b",
+    marginBottom: "6px",
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  thinking: {
+    color: "#64748b",
+    fontSize: "14px",
+    fontStyle: "italic",
+  },
+  chatInputRow: {
+    display: "flex",
+    gap: "8px",
+  },
+  chatInput: {
+    flex: 1,
+    padding: "10px 14px",
+    borderRadius: "8px",
+    border: "1px solid #334155",
+    backgroundColor: "#0f172a",
+    color: "#f8fafc",
+    fontSize: "14px",
+  },
+  sendButton: {
+    padding: "10px 20px",
+    backgroundColor: "#6366f1",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  sendButtonDisabled: {
+    padding: "10px 20px",
+    backgroundColor: "#334155",
+    color: "#64748b",
+    border: "none",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "not-allowed",
   },
 };
