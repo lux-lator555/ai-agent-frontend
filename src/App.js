@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-const RENDER_URL = "https://your-render-url.onrender.com";
+const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
 
 export default function App() {
   const [file, setFile] = useState(null);
