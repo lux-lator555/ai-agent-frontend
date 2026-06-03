@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
-const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
+const RENDER_URL = "https://your-render-url.onrender.com";
 
 export default function App() {
   const [file, setFile] = useState(null);
   const [goal, setGoal] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const resultsRef = useRef(null);
 
   const handleAnalyze = async () => {
     if (!file || !goal || !apiKey) {
@@ -39,6 +43,50 @@ export default function App() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!resultsRef.current) return;
+    setExporting(true);
+
+    try {
+      const canvas = await html2canvas(resultsRef.current, {
+        scale: 2,
+        backgroundColor: "#1e293b",
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save("AI_Analysis_Report.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -97,50 +145,57 @@ export default function App() {
         {error && <p style={styles.error}>{error}</p>}
 
         {result && (
-          <div style={styles.results}>
-            <h2 style={styles.resultsTitle}>📊 Results</h2>
-            <p style={styles.meta}>
-              {result.rows} rows · {result.columns} columns · {result.turns} agent turns
-            </p>
+          <div>
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              style={exporting ? styles.exportButtonDisabled : styles.exportButton}
+            >
+              {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
+            </button>
 
-            {/* Technical Analysis */}
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
-              <div style={styles.markdownBody}>
-                <ReactMarkdown>
-                  {cleanSummary(result.summary)}
-                </ReactMarkdown>
-              </div>
-            </div>
+            <div ref={resultsRef} style={styles.results}>
+              <h2 style={styles.resultsTitle}>📊 Analysis Report</h2>
+              <p style={styles.meta}>
+                {result.rows} rows · {result.columns} columns · {result.turns} agent turns
+              </p>
 
-            {/* Charts */}
-            {result.charts && result.charts.length > 0 && (
               <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>📉 Charts</h3>
-                {result.charts.map((chart, i) => (
-                  <img
-                    key={i}
-                    src={`data:image/png;base64,${chart}`}
-                    alt={`Chart ${i + 1}`}
-                    style={styles.chart}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Business Recommendations */}
-            {result.recommendations && (
-              <div style={styles.recommendationsCard}>
-                <h3 style={styles.recommendationsTitle}>
-                  💡 Business Recommendations
-                </h3>
+                <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
                 <div style={styles.markdownBody}>
                   <ReactMarkdown>
-                    {result.recommendations}
+                    {cleanSummary(result.summary)}
                   </ReactMarkdown>
                 </div>
               </div>
-            )}
+
+              {result.charts && result.charts.length > 0 && (
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>📉 Charts</h3>
+                  {result.charts.map((chart, i) => (
+                    <img
+                      key={i}
+                      src={`data:image/png;base64,${chart}`}
+                      alt={`Chart ${i + 1}`}
+                      style={styles.chart}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {result.recommendations && (
+                <div style={styles.recommendationsCard}>
+                  <h3 style={styles.recommendationsTitle}>
+                    💡 Business Recommendations
+                  </h3>
+                  <div style={styles.markdownBody}>
+                    <ReactMarkdown>
+                      {result.recommendations}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -231,6 +286,30 @@ const styles = {
     fontWeight: "600",
     cursor: "not-allowed",
     marginTop: "8px",
+  },
+  exportButton: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "#0f172a",
+    color: "#6366f1",
+    border: "2px solid #6366f1",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginTop: "16px",
+  },
+  exportButtonDisabled: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "#0f172a",
+    color: "#334155",
+    border: "2px solid #334155",
+    borderRadius: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "not-allowed",
+    marginTop: "16px",
   },
   error: {
     color: "#f87171",
