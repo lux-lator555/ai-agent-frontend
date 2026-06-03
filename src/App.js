@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
 
@@ -43,7 +44,6 @@ export default function App() {
 
   const cleanSummary = (text) => {
     if (!text) return "";
-    // Remove code blocks
     return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
   };
 
@@ -104,13 +104,19 @@ export default function App() {
             </p>
 
             {/* Technical Analysis */}
-            <h3 style={styles.sectionTitle}>Technical Analysis</h3>
-            <p style={styles.summary}>{cleanSummary(result.summary)}</p>
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
+              <div style={styles.markdownBody}>
+                <ReactMarkdown>
+                  {cleanSummary(result.summary)}
+                </ReactMarkdown>
+              </div>
+            </div>
 
             {/* Charts */}
             {result.charts && result.charts.length > 0 && (
-              <div>
-                <h3 style={styles.sectionTitle}>Charts</h3>
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>📉 Charts</h3>
                 {result.charts.map((chart, i) => (
                   <img
                     key={i}
@@ -128,9 +134,11 @@ export default function App() {
                 <h3 style={styles.recommendationsTitle}>
                   💡 Business Recommendations
                 </h3>
-                <p style={styles.recommendations}>
-                  {result.recommendations}
-                </p>
+                <div style={styles.markdownBody}>
+                  <ReactMarkdown>
+                    {result.recommendations}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
           </div>
@@ -244,17 +252,20 @@ const styles = {
     fontSize: "13px",
     marginBottom: "20px",
   },
+  section: {
+    marginBottom: "32px",
+  },
   sectionTitle: {
     color: "#cbd5e1",
     fontSize: "16px",
+    fontWeight: "600",
     marginBottom: "12px",
     marginTop: "24px",
   },
-  summary: {
+  markdownBody: {
     color: "#94a3b8",
     fontSize: "14px",
-    lineHeight: "1.7",
-    whiteSpace: "pre-wrap",
+    lineHeight: "1.8",
   },
   chart: {
     width: "100%",
@@ -273,11 +284,6 @@ const styles = {
     color: "#6366f1",
     fontSize: "18px",
     marginBottom: "16px",
-  },
-  recommendations: {
-    color: "#94a3b8",
-    fontSize: "14px",
-    lineHeight: "1.8",
-    whiteSpace: "pre-wrap",
+    fontWeight: "600",
   },
 };
