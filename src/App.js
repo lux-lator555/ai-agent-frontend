@@ -20,20 +20,20 @@ const STATUS_MESSAGES = [
 
 function RobotLoader() {
   const [position, setPosition] = useState(0);
-  const [direction, setDirection] = useState(1);
+  const [directionRef] = useState({ value: 1 });
   const [messageIndex, setMessageIndex] = useState(0);
   const [flip, setFlip] = useState(false);
 
   useEffect(() => {
     const moveRobot = setInterval(() => {
       setPosition((prev) => {
-        const next = prev + direction * 2;
+        const next = prev + directionRef.value * 2;
         if (next >= 90) {
-          setDirection(-1);
+          directionRef.value = -1;
           setFlip(true);
         }
         if (next <= 0) {
-          setDirection(1);
+          directionRef.value = 1;
           setFlip(false);
         }
         return Math.max(0, Math.min(90, next));
@@ -48,13 +48,11 @@ function RobotLoader() {
       clearInterval(moveRobot);
       clearInterval(rotateMessage);
     };
-  }, [direction]);
+  }, []);
 
   return (
     <div style={loaderStyles.container}>
-      {/* Progress track */}
       <div style={loaderStyles.track}>
-        {/* Robot */}
         <div
           style={{
             ...loaderStyles.robot,
@@ -64,11 +62,8 @@ function RobotLoader() {
         >
           🤖
         </div>
-        {/* Track line */}
         <div style={loaderStyles.trackLine} />
       </div>
-
-      {/* Status message */}
       <p style={loaderStyles.message}>
         {STATUS_MESSAGES[messageIndex]}
       </p>
