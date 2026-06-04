@@ -48,7 +48,7 @@ function RobotLoader() {
       clearInterval(moveRobot);
       clearInterval(rotateMessage);
     };
-  }, []);
+  }, [directionRef]);
 
   return (
     <div style={loaderStyles.container}>
