@@ -113,8 +113,7 @@ const loaderStyles = {
 // Extract model metrics from summary text for comparison table
 function extractMetrics(summary) {
   const models = {};
-  const lines = summary.split("\n");
-  let currentModel = null;
+  const text = summary;
 
   const modelPatterns = [
     { pattern: /logistic regression/i, name: "Logistic Regression" },
@@ -124,31 +123,50 @@ function extractMetrics(summary) {
   ];
 
   const metricPatterns = [
-    { pattern: /accuracy[:\s]+([0-9.]+)/i, key: "Accuracy" },
-    { pattern: /precision[:\s]+([0-9.]+)/i, key: "Precision" },
-    { pattern: /recall[:\s]+([0-9.]+)/i, key: "Recall" },
-    { pattern: /f1[- ]?score[:\s]+([0-9.]+)/i, key: "F1 Score" },
-    { pattern: /r2[:\s]+([0-9.]+)/i, key: "R² Score" },
-    { pattern: /rmse[:\s]+([0-9.]+)/i, key: "RMSE" },
-    { pattern: /mae[:\s]+([0-9.]+)/i, key: "MAE" },
+    { pattern: /accuracy[:\s*|**]*([0-9.]+)/i, key: "Accuracy" },
+    { pattern: /precision[:\s*|**]*([0-9.]+)/i, key: "Precision" },
+    { pattern: /recall[:\s*|**]*([0-9.]+)/i, key: "Recall" },
+    { pattern: /f1[- ]?score[:\s*|**]*([0-9.]+)/i, key: "F1 Score" },
+    { pattern: /r2[:\s*|**]*([0-9.]+)/i, key: "R² Score" },
+    { pattern: /rmse[:\s*|**]*([0-9.]+)/i, key: "RMSE" },
+    { pattern: /mae[:\s*|**]*([0-9.]+)/i, key: "MAE" },
   ];
 
-  for (const line of lines) {
-    for (const { pattern, name } of modelPatterns) {
-      if (pattern.test(line)) {
-        currentModel = name;
-        if (!models[currentModel]) models[currentModel] = {};
-      }
+  // Split text into sections by model name
+  const sections = [];
+  let lastIndex = 0;
+  let lastModel = null;
+
+  const allMatches = [];
+  for (const { pattern, name } of modelPatterns) {
+    const regex = new RegExp(pattern.source, 'gi');
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      allMatches.push({ index: match.index, name });
     }
-    if (currentModel) {
-      for (const { pattern, key } of metricPatterns) {
-        const match = line.match(pattern);
-        if (match) {
-          models[currentModel][key] = parseFloat(match[1]).toFixed(4);
+  }
+
+  allMatches.sort((a, b) => a.index - b.index);
+
+  for (let i = 0; i < allMatches.length; i++) {
+    const start = allMatches[i].index;
+    const end = allMatches[i + 1]?.index || text.length;
+    const section = text.substring(start, end);
+    const modelName = allMatches[i].name;
+
+    if (!models[modelName]) models[modelName] = {};
+
+    for (const { pattern, key } of metricPatterns) {
+      const match = section.match(pattern);
+      if (match) {
+        const val = parseFloat(match[1]);
+        if (!isNaN(val) && val <= 1000) {
+          models[modelName][key] = val.toFixed(4);
         }
       }
     }
   }
+
   return models;
 }
 
