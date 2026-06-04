@@ -110,6 +110,133 @@ const loaderStyles = {
   },
 };
 
+// Extract model metrics from summary text for comparison table
+function extractMetrics(summary) {
+  const models = {};
+  const lines = summary.split("\n");
+  let currentModel = null;
+
+  const modelPatterns = [
+    { pattern: /logistic regression/i, name: "Logistic Regression" },
+    { pattern: /random forest/i, name: "Random Forest" },
+    { pattern: /linear regression/i, name: "Linear Regression" },
+    { pattern: /k-?means/i, name: "K-Means" },
+  ];
+
+  const metricPatterns = [
+    { pattern: /accuracy[:\s]+([0-9.]+)/i, key: "Accuracy" },
+    { pattern: /precision[:\s]+([0-9.]+)/i, key: "Precision" },
+    { pattern: /recall[:\s]+([0-9.]+)/i, key: "Recall" },
+    { pattern: /f1[- ]?score[:\s]+([0-9.]+)/i, key: "F1 Score" },
+    { pattern: /r2[:\s]+([0-9.]+)/i, key: "R² Score" },
+    { pattern: /rmse[:\s]+([0-9.]+)/i, key: "RMSE" },
+    { pattern: /mae[:\s]+([0-9.]+)/i, key: "MAE" },
+  ];
+
+  for (const line of lines) {
+    for (const { pattern, name } of modelPatterns) {
+      if (pattern.test(line)) {
+        currentModel = name;
+        if (!models[currentModel]) models[currentModel] = {};
+      }
+    }
+    if (currentModel) {
+      for (const { pattern, key } of metricPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          models[currentModel][key] = parseFloat(match[1]).toFixed(4);
+        }
+      }
+    }
+  }
+  return models;
+}
+
+function ModelComparisonTable({ summary }) {
+  const metrics = extractMetrics(summary);
+  const modelNames = Object.keys(metrics);
+
+  if (modelNames.length < 2) return null;
+
+  const allMetrics = [...new Set(modelNames.flatMap((m) => Object.keys(metrics[m])))];
+
+  return (
+    <div style={tableStyles.container}>
+      <h3 style={tableStyles.title}>📊 Model Comparison</h3>
+      <div style={tableStyles.wrapper}>
+        <table style={tableStyles.table}>
+          <thead>
+            <tr>
+              <th style={tableStyles.th}>Metric</th>
+              {modelNames.map((m) => (
+                <th key={m} style={tableStyles.th}>{m}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {allMetrics.map((metric) => {
+              const values = modelNames.map((m) => parseFloat(metrics[m][metric] || 0));
+              const best = Math.max(...values);
+              return (
+                <tr key={metric}>
+                  <td style={tableStyles.td}>{metric}</td>
+                  {modelNames.map((m, i) => (
+                    <td
+                      key={m}
+                      style={{
+                        ...tableStyles.td,
+                        color: values[i] === best ? "#6366f1" : "#94a3b8",
+                        fontWeight: values[i] === best ? "700" : "400",
+                      }}
+                    >
+                      {metrics[m][metric] || "—"}
+                      {values[i] === best && " ✓"}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const tableStyles = {
+  container: {
+    marginTop: "24px",
+    marginBottom: "24px",
+  },
+  title: {
+    color: "#cbd5e1",
+    fontSize: "16px",
+    fontWeight: "600",
+    marginBottom: "12px",
+  },
+  wrapper: {
+    overflowX: "auto",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "13px",
+  },
+  th: {
+    backgroundColor: "#0f172a",
+    color: "#cbd5e1",
+    padding: "10px 14px",
+    textAlign: "left",
+    borderBottom: "1px solid #334155",
+    fontWeight: "600",
+  },
+  td: {
+    padding: "10px 14px",
+    borderBottom: "1px solid #1e293b",
+    color: "#94a3b8",
+  },
+};
+
 export default function App() {
   const [file, setFile] = useState(null);
   const [goal, setGoal] = useState("");
@@ -121,6 +248,8 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [copySuccess, setCopySuccess] = useState(false);
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
 
@@ -149,6 +278,19 @@ export default function App() {
       if (!response.ok) throw new Error("Server error — please try again.");
       const data = await response.json();
       setResult(data);
+
+      // Save to history
+      setHistory((prev) => [
+        {
+          id: Date.now(),
+          filename: file.name,
+          goal: goal.substring(0, 60) + (goal.length > 60 ? "..." : ""),
+          timestamp: new Date().toLocaleTimeString(),
+          data,
+        },
+        ...prev.slice(0, 2),
+      ]);
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -245,6 +387,12 @@ export default function App() {
     }
   };
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(result.recommendations);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
   const cleanSummary = (text) => {
     if (!text) return "";
     return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
@@ -257,6 +405,28 @@ export default function App() {
         <p style={styles.subtitle}>
           Upload a CSV, describe your goal, and let the agent analyze your data.
         </p>
+
+        {/* Analysis History */}
+        {history.length > 0 && (
+          <div style={styles.historyContainer}>
+            <p style={styles.historyLabel}>Recent analyses:</p>
+            <div style={styles.historyList}>
+              {history.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setResult(item.data);
+                    setChatHistory([]);
+                  }}
+                  style={styles.historyItem}
+                >
+                  <span style={styles.historyFile}>📁 {item.filename}</span>
+                  <span style={styles.historyTime}>{item.timestamp}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={styles.field}>
           <label style={styles.label}>Upload CSV</label>
@@ -276,6 +446,25 @@ export default function App() {
             onChange={(e) => setGoal(e.target.value)}
             style={styles.textarea}
           />
+          <div style={styles.suggestedPrompts}>
+            <p style={styles.suggestedLabel}>Suggested prompts:</p>
+            <div style={styles.promptButtons}>
+              {[
+                "Predict which customers are likely to churn. Run logistic regression and random forest, show feature importance, accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts.",
+                "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts.",
+                "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
+                "Predict which shipments are likely to be delayed. Run logistic regression and random forest, show feature importance, model accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts."
+              ].map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => setGoal(prompt)}
+                  style={styles.promptButton}
+                >
+                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay"][i]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div style={styles.field}>
@@ -297,7 +486,6 @@ export default function App() {
           {loading ? "Analyzing..." : "▶ Run Agent"}
         </button>
 
-        {/* Robot Loader */}
         {loading && <RobotLoader />}
 
         {error && <p style={styles.error}>{error}</p>}
@@ -327,6 +515,9 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Model Comparison Table */}
+              <ModelComparisonTable summary={cleanSummary(result.summary)} />
+
               {result.charts && result.charts.length > 0 && (
                 <div style={styles.section}>
                   <h3 style={styles.sectionTitle}>📉 Charts</h3>
@@ -343,9 +534,17 @@ export default function App() {
 
               {result.recommendations && (
                 <div style={styles.recommendationsCard}>
-                  <h3 style={styles.recommendationsTitle}>
-                    💡 Business Recommendations
-                  </h3>
+                  <div style={styles.recommendationsHeader}>
+                    <h3 style={styles.recommendationsTitle}>
+                      💡 Business Recommendations
+                    </h3>
+                    <button
+                      onClick={handleCopy}
+                      style={styles.copyButton}
+                    >
+                      {copySuccess ? "✅ Copied!" : "📋 Copy"}
+                    </button>
+                  </div>
                   <div style={styles.markdownBody}>
                     <ReactMarkdown>
                       {result.recommendations}
@@ -355,7 +554,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Chat Section */}
             <div style={styles.chatContainer}>
               <h3 style={styles.chatTitle}>💬 Ask a Follow-Up Question</h3>
               <p style={styles.chatSubtitle}>
@@ -440,6 +638,42 @@ const styles = {
     color: "#94a3b8",
     marginBottom: "32px",
     fontSize: "15px",
+  },
+  historyContainer: {
+    marginBottom: "24px",
+    padding: "12px",
+    backgroundColor: "#0f172a",
+    borderRadius: "8px",
+    border: "1px solid #334155",
+  },
+  historyLabel: {
+    color: "#64748b",
+    fontSize: "12px",
+    marginBottom: "8px",
+  },
+  historyList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+  historyItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 12px",
+    backgroundColor: "#1e293b",
+    border: "1px solid #334155",
+    borderRadius: "6px",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  historyFile: {
+    color: "#cbd5e1",
+    fontSize: "12px",
+  },
+  historyTime: {
+    color: "#64748b",
+    fontSize: "11px",
   },
   field: {
     marginBottom: "20px",
@@ -569,11 +803,27 @@ const styles = {
     padding: "24px",
     border: "1px solid #6366f1",
   },
+  recommendationsHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+  },
   recommendationsTitle: {
     color: "#6366f1",
     fontSize: "18px",
-    marginBottom: "16px",
+    marginBottom: "0px",
     fontWeight: "600",
+  },
+  copyButton: {
+    padding: "6px 12px",
+    backgroundColor: "#1e293b",
+    color: "#6366f1",
+    border: "1px solid #6366f1",
+    borderRadius: "8px",
+    fontSize: "12px",
+    cursor: "pointer",
+    fontWeight: "500",
   },
   chatContainer: {
     marginTop: "32px",
@@ -655,5 +905,28 @@ const styles = {
     fontSize: "14px",
     fontWeight: "600",
     cursor: "not-allowed",
+  },
+  suggestedPrompts: {
+    marginTop: "10px",
+  },
+  suggestedLabel: {
+    color: "#64748b",
+    fontSize: "12px",
+    marginBottom: "8px",
+  },
+  promptButtons: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+  },
+  promptButton: {
+    padding: "6px 12px",
+    backgroundColor: "#0f172a",
+    color: "#6366f1",
+    border: "1px solid #6366f1",
+    borderRadius: "20px",
+    fontSize: "12px",
+    cursor: "pointer",
+    fontWeight: "500",
   },
 };
