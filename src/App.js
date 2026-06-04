@@ -133,9 +133,7 @@ function extractMetrics(summary) {
   ];
 
   // Split text into sections by model name
-  const sections = [];
-  let lastIndex = 0;
-  let lastModel = null;
+
 
   const allMatches = [];
   for (const { pattern, name } of modelPatterns) {
