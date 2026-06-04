@@ -1,9 +1,119 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
+
+const STATUS_MESSAGES = [
+  "Teaching the AI to read spreadsheets...",
+  "Arguing with the random forest about feature importance...",
+  "Convincing the model your data isn't that messy...",
+  "Cross-validating decisions your gut already knew...",
+  "Turning correlation into something your CFO can act on...",
+  "Hyperparameters have been strongly encouraged...",
+  "Finding patterns buried in your pivot tables...",
+  "Random forest has cast its votes...",
+  "Translating p-values into plain English...",
+  "Building a case the data can't deny...",
+];
+
+function RobotLoader() {
+  const [position, setPosition] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [flip, setFlip] = useState(false);
+
+  useEffect(() => {
+    const moveRobot = setInterval(() => {
+      setPosition((prev) => {
+        const next = prev + direction * 2;
+        if (next >= 90) {
+          setDirection(-1);
+          setFlip(true);
+        }
+        if (next <= 0) {
+          setDirection(1);
+          setFlip(false);
+        }
+        return Math.max(0, Math.min(90, next));
+      });
+    }, 50);
+
+    const rotateMessage = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
+    }, 3000);
+
+    return () => {
+      clearInterval(moveRobot);
+      clearInterval(rotateMessage);
+    };
+  }, [direction]);
+
+  return (
+    <div style={loaderStyles.container}>
+      {/* Progress track */}
+      <div style={loaderStyles.track}>
+        {/* Robot */}
+        <div
+          style={{
+            ...loaderStyles.robot,
+            left: `${position}%`,
+            transform: flip ? "scaleX(-1)" : "scaleX(1)",
+          }}
+        >
+          🤖
+        </div>
+        {/* Track line */}
+        <div style={loaderStyles.trackLine} />
+      </div>
+
+      {/* Status message */}
+      <p style={loaderStyles.message}>
+        {STATUS_MESSAGES[messageIndex]}
+      </p>
+    </div>
+  );
+}
+
+const loaderStyles = {
+  container: {
+    marginTop: "24px",
+    marginBottom: "8px",
+    textAlign: "center",
+  },
+  track: {
+    position: "relative",
+    width: "100%",
+    height: "48px",
+    display: "flex",
+    alignItems: "center",
+  },
+  trackLine: {
+    position: "absolute",
+    bottom: "8px",
+    left: "0",
+    right: "0",
+    height: "2px",
+    backgroundColor: "#6366f1",
+    borderRadius: "2px",
+  },
+  robot: {
+    position: "absolute",
+    fontSize: "28px",
+    bottom: "10px",
+    transition: "left 0.05s linear",
+    userSelect: "none",
+  },
+  message: {
+    color: "#6366f1",
+    fontSize: "13px",
+    fontStyle: "italic",
+    marginTop: "12px",
+    minHeight: "20px",
+    transition: "opacity 0.3s",
+  },
+};
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -189,8 +299,11 @@ export default function App() {
           disabled={loading}
           style={loading ? styles.buttonDisabled : styles.button}
         >
-          {loading ? "🔄 Agent is analyzing..." : "▶ Run Agent"}
+          {loading ? "Analyzing..." : "▶ Run Agent"}
         </button>
+
+        {/* Robot Loader */}
+        {loading && <RobotLoader />}
 
         {error && <p style={styles.error}>{error}</p>}
 
@@ -254,7 +367,6 @@ export default function App() {
                 Ask anything about the analysis, request clarification, or explore what-if scenarios.
               </p>
 
-              {/* Chat History */}
               {chatHistory.length > 0 && (
                 <div style={styles.chatHistory}>
                   {chatHistory.map((msg, i) => (
@@ -280,7 +392,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Chat Input */}
               <div style={styles.chatInputRow}>
                 <input
                   type="text"
