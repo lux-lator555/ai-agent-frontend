@@ -564,7 +564,7 @@ export default function App() {
       <div style={styles.card}>
         <h1 style={styles.title}>🤖 AI Data Analyst Agent</h1>
         <p style={styles.subtitle}>
-          Upload a CSV, describe your goal, and let the agent analyze your data.
+           Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.
         </p>
 
         {history.length > 0 && (
@@ -584,6 +584,17 @@ export default function App() {
             </div>
           </div>
         )}
+
+        <div style={styles.field}>
+          <label style={styles.label}>Gemini API Key</label>
+          <input
+            type="password"
+            placeholder="Your Gemini API key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            style={styles.input}
+          />
+        </div>
 
         <div style={styles.field}>
           <label style={styles.label}>Upload CSV</label>
@@ -635,17 +646,6 @@ export default function App() {
               ))}
             </div>
           </div>
-        </div>
-
-        <div style={styles.field}>
-          <label style={styles.label}>Gemini API Key</label>
-          <input
-            type="password"
-            placeholder="Your Gemini API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            style={styles.input}
-          />
         </div>
 
         <button
