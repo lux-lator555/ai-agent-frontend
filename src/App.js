@@ -110,7 +110,6 @@ const loaderStyles = {
   },
 };
 
-// Extract model metrics from summary text for comparison table
 function extractMetrics(summary) {
   const models = {};
   const text = summary;
@@ -131,9 +130,6 @@ function extractMetrics(summary) {
     { pattern: /rmse[:\s*|**]*([0-9.]+)/i, key: "RMSE" },
     { pattern: /mae[:\s*|**]*([0-9.]+)/i, key: "MAE" },
   ];
-
-  // Split text into sections by model name
-
 
   const allMatches = [];
   for (const { pattern, name } of modelPatterns) {
@@ -164,16 +160,13 @@ function extractMetrics(summary) {
       }
     }
   }
-
   return models;
 }
 
 function ModelComparisonTable({ summary }) {
   const metrics = extractMetrics(summary);
   const modelNames = Object.keys(metrics);
-
   if (modelNames.length < 2) return null;
-
   const allMetrics = [...new Set(modelNames.flatMap((m) => Object.keys(metrics[m])))];
 
   return (
@@ -197,14 +190,11 @@ function ModelComparisonTable({ summary }) {
                 <tr key={metric}>
                   <td style={tableStyles.td}>{metric}</td>
                   {modelNames.map((m, i) => (
-                    <td
-                      key={m}
-                      style={{
-                        ...tableStyles.td,
-                        color: values[i] === best ? "#6366f1" : "#94a3b8",
-                        fontWeight: values[i] === best ? "700" : "400",
-                      }}
-                    >
+                    <td key={m} style={{
+                      ...tableStyles.td,
+                      color: values[i] === best ? "#6366f1" : "#94a3b8",
+                      fontWeight: values[i] === best ? "700" : "400",
+                    }}>
                       {metrics[m][metric] || "—"}
                       {values[i] === best && " ✓"}
                     </td>
@@ -220,37 +210,164 @@ function ModelComparisonTable({ summary }) {
 }
 
 const tableStyles = {
-  container: {
-    marginTop: "24px",
-    marginBottom: "24px",
-  },
-  title: {
-    color: "#cbd5e1",
-    fontSize: "16px",
-    fontWeight: "600",
-    marginBottom: "12px",
-  },
-  wrapper: {
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "13px",
-  },
-  th: {
-    backgroundColor: "#0f172a",
-    color: "#cbd5e1",
-    padding: "10px 14px",
-    textAlign: "left",
-    borderBottom: "1px solid #334155",
-    fontWeight: "600",
-  },
-  td: {
-    padding: "10px 14px",
-    borderBottom: "1px solid #1e293b",
-    color: "#94a3b8",
-  },
+  container: { marginTop: "24px", marginBottom: "24px" },
+  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px" },
+  wrapper: { overflowX: "auto" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "13px" },
+  th: { backgroundColor: "#0f172a", color: "#cbd5e1", padding: "10px 14px", textAlign: "left", borderBottom: "1px solid #334155", fontWeight: "600" },
+  td: { padding: "10px 14px", borderBottom: "1px solid #1e293b", color: "#94a3b8" },
+};
+
+function DataQualityReport({ report }) {
+  if (!report) return null;
+  const hasIssues = Object.keys(report.missing_values).length > 0 ||
+    Object.keys(report.outliers).length > 0 || report.duplicates > 0;
+
+  return (
+    <div style={qualityStyles.container}>
+      <h3 style={qualityStyles.title}>🔍 Data Quality Report</h3>
+      <div style={qualityStyles.grid}>
+        <div style={qualityStyles.stat}>
+          <span style={qualityStyles.statValue}>{report.total_rows}</span>
+          <span style={qualityStyles.statLabel}>Total Rows</span>
+        </div>
+        <div style={qualityStyles.stat}>
+          <span style={qualityStyles.statValue}>{report.total_columns}</span>
+          <span style={qualityStyles.statLabel}>Columns</span>
+        </div>
+        <div style={qualityStyles.stat}>
+          <span style={{
+            ...qualityStyles.statValue,
+            color: report.duplicates > 0 ? "#f87171" : "#4ade80"
+          }}>
+            {report.duplicates}
+          </span>
+          <span style={qualityStyles.statLabel}>Duplicates</span>
+        </div>
+        <div style={qualityStyles.stat}>
+          <span style={{
+            ...qualityStyles.statValue,
+            color: Object.keys(report.missing_values).length > 0 ? "#fbbf24" : "#4ade80"
+          }}>
+            {Object.keys(report.missing_values).length}
+          </span>
+          <span style={qualityStyles.statLabel}>Cols w/ Missing</span>
+        </div>
+      </div>
+
+      {Object.keys(report.missing_values).length > 0 && (
+        <div style={qualityStyles.section}>
+          <p style={qualityStyles.sectionTitle}>⚠️ Missing Values</p>
+          {Object.entries(report.missing_values).map(([col, info]) => (
+            <div key={col} style={qualityStyles.item}>
+              <span style={qualityStyles.colName}>{col}</span>
+              <span style={qualityStyles.colValue}>{info.count} missing ({info.percentage}%)</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {Object.keys(report.outliers).length > 0 && (
+        <div style={qualityStyles.section}>
+          <p style={qualityStyles.sectionTitle}>📊 Outliers Detected</p>
+          {Object.entries(report.outliers).map(([col, count]) => (
+            <div key={col} style={qualityStyles.item}>
+              <span style={qualityStyles.colName}>{col}</span>
+              <span style={qualityStyles.colValue}>{count} outliers</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={qualityStyles.section}>
+        <p style={qualityStyles.sectionTitle}>
+          {hasIssues ? "💡 Recommendations" : "✅ Data Quality"}
+        </p>
+        {report.recommendations.map((rec, i) => (
+          <p key={i} style={qualityStyles.recommendation}>{rec}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const qualityStyles = {
+  container: { marginBottom: "24px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "20px", border: "1px solid #334155" },
+  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "16px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" },
+  stat: { textAlign: "center", padding: "12px", backgroundColor: "#1e293b", borderRadius: "8px" },
+  statValue: { display: "block", fontSize: "24px", fontWeight: "700", color: "#f8fafc" },
+  statLabel: { display: "block", fontSize: "11px", color: "#64748b", marginTop: "4px" },
+  section: { marginTop: "12px" },
+  sectionTitle: { color: "#94a3b8", fontSize: "13px", fontWeight: "600", marginBottom: "8px" },
+  item: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1e293b" },
+  colName: { color: "#cbd5e1", fontSize: "13px" },
+  colValue: { color: "#fbbf24", fontSize: "13px" },
+  recommendation: { color: "#4ade80", fontSize: "13px", marginBottom: "4px" },
+};
+
+function ConfidenceScores({ scores }) {
+  if (!scores || !scores.scores || scores.scores.length === 0) return null;
+
+  const colorMap = {
+    high: "#4ade80",
+    medium: "#fbbf24",
+    low: "#f87171",
+  };
+
+  const emojiMap = {
+    high: "🟢",
+    medium: "🟡",
+    low: "🔴",
+  };
+
+  return (
+    <div style={confidenceStyles.container}>
+      <div style={confidenceStyles.header}>
+        <h3 style={confidenceStyles.title}>🎯 Confidence Assessment</h3>
+        <span style={{
+          ...confidenceStyles.badge,
+          backgroundColor: colorMap[scores.overall_confidence] + "20",
+          color: colorMap[scores.overall_confidence],
+          border: `1px solid ${colorMap[scores.overall_confidence]}`,
+        }}>
+          {emojiMap[scores.overall_confidence]} Overall: {scores.overall_confidence.toUpperCase()}
+        </span>
+      </div>
+
+      {scores.scores.map((item, i) => (
+        <div key={i} style={confidenceStyles.item}>
+          <div style={confidenceStyles.itemHeader}>
+            <span style={confidenceStyles.finding}>{item.finding}</span>
+            <span style={{
+              ...confidenceStyles.itemBadge,
+              color: colorMap[item.confidence],
+            }}>
+              {emojiMap[item.confidence]} {item.confidence.toUpperCase()}
+            </span>
+          </div>
+          <p style={confidenceStyles.reason}>{item.reason}</p>
+        </div>
+      ))}
+
+      {scores.caveats && (
+        <p style={confidenceStyles.caveats}>⚠️ {scores.caveats}</p>
+      )}
+    </div>
+  );
+}
+
+const confidenceStyles = {
+  container: { marginTop: "24px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "20px", border: "1px solid #334155" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
+  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600" },
+  badge: { padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" },
+  item: { padding: "10px 0", borderBottom: "1px solid #1e293b" },
+  itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" },
+  finding: { color: "#cbd5e1", fontSize: "13px" },
+  itemBadge: { fontSize: "12px", fontWeight: "600" },
+  reason: { color: "#64748b", fontSize: "12px", margin: "0" },
+  caveats: { color: "#fbbf24", fontSize: "12px", marginTop: "12px" },
 };
 
 export default function App() {
@@ -258,6 +375,7 @@ export default function App() {
   const [goal, setGoal] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -266,8 +384,40 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [detection, setDetection] = useState(null);
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
+
+  const handleFileChange = async (e) => {
+    const selectedFile = e.target.files[0];
+    setFile(selectedFile);
+    setDetection(null);
+    setGoal("");
+
+    if (selectedFile && apiKey) {
+      setDetecting(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("api_key", apiKey);
+
+        const response = await fetch(`${RENDER_URL}/autodetect`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setDetection(data);
+          setGoal(data.suggested_goal);
+        }
+      } catch (err) {
+        console.error("Auto-detect failed:", err);
+      } finally {
+        setDetecting(false);
+      }
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!file || !goal || !apiKey) {
@@ -295,7 +445,6 @@ export default function App() {
       const data = await response.json();
       setResult(data);
 
-      // Save to history
       setHistory((prev) => [
         {
           id: Date.now(),
@@ -371,11 +520,7 @@ export default function App() {
       });
 
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -422,7 +567,6 @@ export default function App() {
           Upload a CSV, describe your goal, and let the agent analyze your data.
         </p>
 
-        {/* Analysis History */}
         {history.length > 0 && (
           <div style={styles.historyContainer}>
             <p style={styles.historyLabel}>Recent analyses:</p>
@@ -430,10 +574,7 @@ export default function App() {
               {history.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setResult(item.data);
-                    setChatHistory([]);
-                  }}
+                  onClick={() => { setResult(item.data); setChatHistory([]); }}
                   style={styles.historyItem}
                 >
                   <span style={styles.historyFile}>📁 {item.filename}</span>
@@ -449,9 +590,22 @@ export default function App() {
           <input
             type="file"
             accept=".csv"
-            onChange={(e) => setFile(e.target.files[0])}
+            onChange={handleFileChange}
             style={styles.input}
           />
+          {detecting && (
+            <p style={styles.detecting}>🔍 Scanning dataset...</p>
+          )}
+          {detection && (
+            <div style={styles.detectionCard}>
+              <p style={styles.detectionTitle}>🎯 Auto-detected: {detection.problem_type}</p>
+              <p style={styles.detectionDetail}>
+                Target: <strong>{detection.target_column || "None (unsupervised)"}</strong> ·
+                Models: <strong>{detection.recommended_models?.join(", ")}</strong>
+              </p>
+              <p style={styles.detectionReasoning}>{detection.reasoning}</p>
+            </div>
+          )}
         </div>
 
         <div style={styles.field}>
@@ -503,7 +657,6 @@ export default function App() {
         </button>
 
         {loading && <RobotLoader />}
-
         {error && <p style={styles.error}>{error}</p>}
 
         {result && (
@@ -522,6 +675,8 @@ export default function App() {
                 {result.rows} rows · {result.columns} columns · {result.turns} agent turns
               </p>
 
+              <DataQualityReport report={result.quality_report} />
+
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
                 <div style={styles.markdownBody}>
@@ -531,8 +686,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Model Comparison Table */}
               <ModelComparisonTable summary={cleanSummary(result.summary)} />
+
+              <ConfidenceScores scores={result.confidence_scores} />
 
               {result.charts && result.charts.length > 0 && (
                 <div style={styles.section}>
@@ -554,10 +710,7 @@ export default function App() {
                     <h3 style={styles.recommendationsTitle}>
                       💡 Business Recommendations
                     </h3>
-                    <button
-                      onClick={handleCopy}
-                      style={styles.copyButton}
-                    >
+                    <button onClick={handleCopy} style={styles.copyButton}>
                       {copySuccess ? "✅ Copied!" : "📋 Copy"}
                     </button>
                   </div>
@@ -579,10 +732,7 @@ export default function App() {
               {chatHistory.length > 0 && (
                 <div style={styles.chatHistory}>
                   {chatHistory.map((msg, i) => (
-                    <div
-                      key={i}
-                      style={msg.role === "user" ? styles.userBubble : styles.agentBubble}
-                    >
+                    <div key={i} style={msg.role === "user" ? styles.userBubble : styles.agentBubble}>
                       <div style={styles.bubbleLabel}>
                         {msg.role === "user" ? "You" : "🤖 Agent"}
                       </div>
@@ -645,16 +795,8 @@ const styles = {
     maxWidth: "720px",
     boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
   },
-  title: {
-    color: "#f8fafc",
-    fontSize: "28px",
-    marginBottom: "8px",
-  },
-  subtitle: {
-    color: "#94a3b8",
-    marginBottom: "32px",
-    fontSize: "15px",
-  },
+  title: { color: "#f8fafc", fontSize: "28px", marginBottom: "8px" },
+  subtitle: { color: "#94a3b8", marginBottom: "32px", fontSize: "15px" },
   historyContainer: {
     marginBottom: "24px",
     padding: "12px",
@@ -662,16 +804,8 @@ const styles = {
     borderRadius: "8px",
     border: "1px solid #334155",
   },
-  historyLabel: {
-    color: "#64748b",
-    fontSize: "12px",
-    marginBottom: "8px",
-  },
-  historyList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-  },
+  historyLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
+  historyList: { display: "flex", flexDirection: "column", gap: "6px" },
   historyItem: {
     display: "flex",
     justifyContent: "space-between",
@@ -683,24 +817,21 @@ const styles = {
     cursor: "pointer",
     textAlign: "left",
   },
-  historyFile: {
-    color: "#cbd5e1",
-    fontSize: "12px",
+  historyFile: { color: "#cbd5e1", fontSize: "12px" },
+  historyTime: { color: "#64748b", fontSize: "11px" },
+  detecting: { color: "#6366f1", fontSize: "12px", marginTop: "8px", fontStyle: "italic" },
+  detectionCard: {
+    marginTop: "10px",
+    padding: "12px",
+    backgroundColor: "#0f172a",
+    borderRadius: "8px",
+    border: "1px solid #6366f1",
   },
-  historyTime: {
-    color: "#64748b",
-    fontSize: "11px",
-  },
-  field: {
-    marginBottom: "20px",
-  },
-  label: {
-    display: "block",
-    color: "#cbd5e1",
-    marginBottom: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-  },
+  detectionTitle: { color: "#6366f1", fontSize: "13px", fontWeight: "600", marginBottom: "4px" },
+  detectionDetail: { color: "#94a3b8", fontSize: "12px", marginBottom: "4px" },
+  detectionReasoning: { color: "#64748b", fontSize: "12px", fontStyle: "italic" },
+  field: { marginBottom: "20px" },
+  label: { display: "block", color: "#cbd5e1", marginBottom: "8px", fontSize: "14px", fontWeight: "600" },
   input: {
     width: "100%",
     padding: "10px 14px",
@@ -771,47 +902,14 @@ const styles = {
     cursor: "not-allowed",
     marginTop: "16px",
   },
-  error: {
-    color: "#f87171",
-    marginTop: "16px",
-    fontSize: "14px",
-  },
-  results: {
-    marginTop: "32px",
-    borderTop: "1px solid #334155",
-    paddingTop: "24px",
-  },
-  resultsTitle: {
-    color: "#f8fafc",
-    fontSize: "20px",
-    marginBottom: "8px",
-  },
-  meta: {
-    color: "#64748b",
-    fontSize: "13px",
-    marginBottom: "20px",
-  },
-  section: {
-    marginBottom: "32px",
-  },
-  sectionTitle: {
-    color: "#cbd5e1",
-    fontSize: "16px",
-    fontWeight: "600",
-    marginBottom: "12px",
-    marginTop: "24px",
-  },
-  markdownBody: {
-    color: "#94a3b8",
-    fontSize: "14px",
-    lineHeight: "1.8",
-  },
-  chart: {
-    width: "100%",
-    borderRadius: "8px",
-    marginBottom: "16px",
-    border: "1px solid #334155",
-  },
+  error: { color: "#f87171", marginTop: "16px", fontSize: "14px" },
+  results: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
+  resultsTitle: { color: "#f8fafc", fontSize: "20px", marginBottom: "8px" },
+  meta: { color: "#64748b", fontSize: "13px", marginBottom: "20px" },
+  section: { marginBottom: "32px" },
+  sectionTitle: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px", marginTop: "24px" },
+  markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
+  chart: { width: "100%", borderRadius: "8px", marginBottom: "16px", border: "1px solid #334155" },
   recommendationsCard: {
     marginTop: "32px",
     backgroundColor: "#0f172a",
@@ -819,18 +917,8 @@ const styles = {
     padding: "24px",
     border: "1px solid #6366f1",
   },
-  recommendationsHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  },
-  recommendationsTitle: {
-    color: "#6366f1",
-    fontSize: "18px",
-    marginBottom: "0px",
-    fontWeight: "600",
-  },
+  recommendationsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
+  recommendationsTitle: { color: "#6366f1", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
   copyButton: {
     padding: "6px 12px",
     backgroundColor: "#1e293b",
@@ -841,58 +929,15 @@ const styles = {
     cursor: "pointer",
     fontWeight: "500",
   },
-  chatContainer: {
-    marginTop: "32px",
-    borderTop: "1px solid #334155",
-    paddingTop: "24px",
-  },
-  chatTitle: {
-    color: "#f8fafc",
-    fontSize: "18px",
-    marginBottom: "8px",
-  },
-  chatSubtitle: {
-    color: "#64748b",
-    fontSize: "13px",
-    marginBottom: "16px",
-  },
-  chatHistory: {
-    marginBottom: "16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  userBubble: {
-    backgroundColor: "#334155",
-    borderRadius: "12px",
-    padding: "12px 16px",
-    alignSelf: "flex-end",
-    maxWidth: "85%",
-    marginLeft: "auto",
-  },
-  agentBubble: {
-    backgroundColor: "#0f172a",
-    borderRadius: "12px",
-    padding: "12px 16px",
-    border: "1px solid #334155",
-    maxWidth: "95%",
-  },
-  bubbleLabel: {
-    fontSize: "11px",
-    color: "#64748b",
-    marginBottom: "6px",
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  thinking: {
-    color: "#64748b",
-    fontSize: "14px",
-    fontStyle: "italic",
-  },
-  chatInputRow: {
-    display: "flex",
-    gap: "8px",
-  },
+  chatContainer: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
+  chatTitle: { color: "#f8fafc", fontSize: "18px", marginBottom: "8px" },
+  chatSubtitle: { color: "#64748b", fontSize: "13px", marginBottom: "16px" },
+  chatHistory: { marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" },
+  userBubble: { backgroundColor: "#334155", borderRadius: "12px", padding: "12px 16px", alignSelf: "flex-end", maxWidth: "85%", marginLeft: "auto" },
+  agentBubble: { backgroundColor: "#0f172a", borderRadius: "12px", padding: "12px 16px", border: "1px solid #334155", maxWidth: "95%" },
+  bubbleLabel: { fontSize: "11px", color: "#64748b", marginBottom: "6px", fontWeight: "600", textTransform: "uppercase" },
+  thinking: { color: "#64748b", fontSize: "14px", fontStyle: "italic" },
+  chatInputRow: { display: "flex", gap: "8px" },
   chatInput: {
     flex: 1,
     padding: "10px 14px",
@@ -922,19 +967,9 @@ const styles = {
     fontWeight: "600",
     cursor: "not-allowed",
   },
-  suggestedPrompts: {
-    marginTop: "10px",
-  },
-  suggestedLabel: {
-    color: "#64748b",
-    fontSize: "12px",
-    marginBottom: "8px",
-  },
-  promptButtons: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-  },
+  suggestedPrompts: { marginTop: "10px" },
+  suggestedLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
+  promptButtons: { display: "flex", flexWrap: "wrap", gap: "8px" },
   promptButton: {
     padding: "6px 12px",
     backgroundColor: "#0f172a",
