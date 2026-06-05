@@ -53,62 +53,70 @@ function RobotLoader() {
   return (
     <div style={loaderStyles.container}>
       <div style={loaderStyles.track}>
-        <div
-          style={{
-            ...loaderStyles.robot,
-            left: `${position}%`,
-            transform: flip ? "scaleX(-1)" : "scaleX(1)",
-          }}
-        >
+        <div style={{
+          ...loaderStyles.robot,
+          left: `${position}%`,
+          transform: flip ? "scaleX(-1)" : "scaleX(1)",
+        }}>
           🤖
         </div>
         <div style={loaderStyles.trackLine} />
       </div>
-      <p style={loaderStyles.message}>
-        {STATUS_MESSAGES[messageIndex]}
-      </p>
+      <p style={loaderStyles.message}>{STATUS_MESSAGES[messageIndex]}</p>
     </div>
   );
 }
 
 const loaderStyles = {
-  container: {
-    marginTop: "24px",
-    marginBottom: "8px",
-    textAlign: "center",
-  },
-  track: {
-    position: "relative",
-    width: "100%",
-    height: "48px",
-    display: "flex",
-    alignItems: "center",
-  },
-  trackLine: {
-    position: "absolute",
-    bottom: "8px",
-    left: "0",
-    right: "0",
-    height: "2px",
-    backgroundColor: "#6366f1",
-    borderRadius: "2px",
-  },
-  robot: {
-    position: "absolute",
-    fontSize: "28px",
-    bottom: "10px",
-    transition: "left 0.05s linear",
-    userSelect: "none",
-  },
-  message: {
-    color: "#6366f1",
-    fontSize: "13px",
-    fontStyle: "italic",
-    marginTop: "12px",
-    minHeight: "20px",
-    transition: "opacity 0.3s",
-  },
+  container: { marginTop: "24px", marginBottom: "8px", textAlign: "center" },
+  track: { position: "relative", width: "100%", height: "48px", display: "flex", alignItems: "center" },
+  trackLine: { position: "absolute", bottom: "8px", left: "0", right: "0", height: "2px", backgroundColor: "#6366f1", borderRadius: "2px" },
+  robot: { position: "absolute", fontSize: "28px", bottom: "10px", transition: "left 0.05s linear", userSelect: "none" },
+  message: { color: "#6366f1", fontSize: "13px", fontStyle: "italic", marginTop: "12px", minHeight: "20px" },
 };
+
+function PlotlyChart({ chartJson }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current || !chartJson) return;
+
+    const loadPlotly = async () => {
+      if (!window.Plotly) {
+        const script = document.createElement("script");
+        script.src = "https://cdn.plot.ly/plotly-2.27.0.min.js";
+        script.onload = () => renderChart();
+        document.head.appendChild(script);
+      } else {
+        renderChart();
+      }
+    };
+
+    const renderChart = () => {
+      try {
+        const data = JSON.parse(chartJson);
+        window.Plotly.newPlot(ref.current, data.data, {
+          ...data.layout,
+          paper_bgcolor: "#0f172a",
+          plot_bgcolor: "#0f172a",
+          font: { color: "#94a3b8" },
+          margin: { t: 40, r: 20, b: 40, l: 60 },
+        }, { responsive: true });
+      } catch (e) {
+        console.error("Plotly render error:", e);
+      }
+    };
+
+    loadPlotly();
+  }, [chartJson]);
+
+  return (
+    <div
+      ref={ref}
+      style={{ width: "100%", minHeight: "400px", borderRadius: "8px", border: "1px solid #334155", marginBottom: "16px" }}
+    />
+  );
+}
 
 function extractMetrics(summary) {
   const models = {};
@@ -177,9 +185,7 @@ function ModelComparisonTable({ summary }) {
           <thead>
             <tr>
               <th style={tableStyles.th}>Metric</th>
-              {modelNames.map((m) => (
-                <th key={m} style={tableStyles.th}>{m}</th>
-              ))}
+              {modelNames.map((m) => <th key={m} style={tableStyles.th}>{m}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -195,8 +201,7 @@ function ModelComparisonTable({ summary }) {
                       color: values[i] === best ? "#6366f1" : "#94a3b8",
                       fontWeight: values[i] === best ? "700" : "400",
                     }}>
-                      {metrics[m][metric] || "—"}
-                      {values[i] === best && " ✓"}
+                      {metrics[m][metric] || "—"}{values[i] === best && " ✓"}
                     </td>
                   ))}
                 </tr>
@@ -236,19 +241,13 @@ function DataQualityReport({ report }) {
           <span style={qualityStyles.statLabel}>Columns</span>
         </div>
         <div style={qualityStyles.stat}>
-          <span style={{
-            ...qualityStyles.statValue,
-            color: report.duplicates > 0 ? "#f87171" : "#4ade80"
-          }}>
+          <span style={{ ...qualityStyles.statValue, color: report.duplicates > 0 ? "#f87171" : "#4ade80" }}>
             {report.duplicates}
           </span>
           <span style={qualityStyles.statLabel}>Duplicates</span>
         </div>
         <div style={qualityStyles.stat}>
-          <span style={{
-            ...qualityStyles.statValue,
-            color: Object.keys(report.missing_values).length > 0 ? "#fbbf24" : "#4ade80"
-          }}>
+          <span style={{ ...qualityStyles.statValue, color: Object.keys(report.missing_values).length > 0 ? "#fbbf24" : "#4ade80" }}>
             {Object.keys(report.missing_values).length}
           </span>
           <span style={qualityStyles.statLabel}>Cols w/ Missing</span>
@@ -280,9 +279,7 @@ function DataQualityReport({ report }) {
       )}
 
       <div style={qualityStyles.section}>
-        <p style={qualityStyles.sectionTitle}>
-          {hasIssues ? "💡 Recommendations" : "✅ Data Quality"}
-        </p>
+        <p style={qualityStyles.sectionTitle}>{hasIssues ? "💡 Recommendations" : "✅ Data Quality"}</p>
         {report.recommendations.map((rec, i) => (
           <p key={i} style={qualityStyles.recommendation}>{rec}</p>
         ))}
@@ -309,17 +306,8 @@ const qualityStyles = {
 function ConfidenceScores({ scores }) {
   if (!scores || !scores.scores || scores.scores.length === 0) return null;
 
-  const colorMap = {
-    high: "#4ade80",
-    medium: "#fbbf24",
-    low: "#f87171",
-  };
-
-  const emojiMap = {
-    high: "🟢",
-    medium: "🟡",
-    low: "🔴",
-  };
+  const colorMap = { high: "#4ade80", medium: "#fbbf24", low: "#f87171" };
+  const emojiMap = { high: "🟢", medium: "🟡", low: "🔴" };
 
   return (
     <div style={confidenceStyles.container}>
@@ -339,10 +327,7 @@ function ConfidenceScores({ scores }) {
         <div key={i} style={confidenceStyles.item}>
           <div style={confidenceStyles.itemHeader}>
             <span style={confidenceStyles.finding}>{item.finding}</span>
-            <span style={{
-              ...confidenceStyles.itemBadge,
-              color: colorMap[item.confidence],
-            }}>
+            <span style={{ ...confidenceStyles.itemBadge, color: colorMap[item.confidence] }}>
               {emojiMap[item.confidence]} {item.confidence.toUpperCase()}
             </span>
           </div>
@@ -350,9 +335,7 @@ function ConfidenceScores({ scores }) {
         </div>
       ))}
 
-      {scores.caveats && (
-        <p style={confidenceStyles.caveats}>⚠️ {scores.caveats}</p>
-      )}
+      {scores.caveats && <p style={confidenceStyles.caveats}>⚠️ {scores.caveats}</p>}
     </div>
   );
 }
@@ -489,10 +472,7 @@ export default function App() {
       if (!response.ok) throw new Error("Server error — please try again.");
       const data = await response.json();
 
-      setChatHistory([
-        ...newHistory,
-        { role: "assistant", content: data.response },
-      ]);
+      setChatHistory([...newHistory, { role: "assistant", content: data.response }]);
 
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -564,7 +544,7 @@ export default function App() {
       <div style={styles.card}>
         <h1 style={styles.title}>🤖 AI Data Analyst Agent</h1>
         <p style={styles.subtitle}>
-           Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.
+          Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.
         </p>
 
         {history.length > 0 && (
@@ -604,9 +584,7 @@ export default function App() {
             onChange={handleFileChange}
             style={styles.input}
           />
-          {detecting && (
-            <p style={styles.detecting}>🔍 Scanning dataset...</p>
-          )}
+          {detecting && <p style={styles.detecting}>🔍 Scanning dataset...</p>}
           {detection && (
             <div style={styles.detectionCard}>
               <p style={styles.detectionTitle}>🎯 Auto-detected: {detection.problem_type}</p>
@@ -631,10 +609,10 @@ export default function App() {
             <p style={styles.suggestedLabel}>Suggested prompts:</p>
             <div style={styles.promptButtons}>
               {[
-                "Predict which customers are likely to churn. Run logistic regression and random forest, show feature importance, accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts.",
-                "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts.",
+                "Predict which customers are likely to churn. Run logistic regression and random forest, show feature importance, accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts. Generate SHAP values to explain which features drive churn predictions.",
+                "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts. Use SHAP to explain salary predictions.",
                 "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
-                "Predict which shipments are likely to be delayed. Run logistic regression and random forest, show feature importance, model accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts."
+                "Predict which shipments are likely to be delayed. Run logistic regression and random forest, show feature importance, model accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts. Use SHAP to explain delay predictions."
               ].map((prompt, i) => (
                 <button
                   key={i}
@@ -680,9 +658,7 @@ export default function App() {
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
                 <div style={styles.markdownBody}>
-                  <ReactMarkdown>
-                    {cleanSummary(result.summary)}
-                  </ReactMarkdown>
+                  <ReactMarkdown>{cleanSummary(result.summary)}</ReactMarkdown>
                 </div>
               </div>
 
@@ -690,9 +666,21 @@ export default function App() {
 
               <ConfidenceScores scores={result.confidence_scores} />
 
+              {/* Plotly Interactive Charts */}
+              {result.plotly_charts && result.plotly_charts.length > 0 && (
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>📉 Interactive Charts</h3>
+                  <p style={styles.chartHint}>💡 Hover over charts to explore data points. Click legend items to toggle series.</p>
+                  {result.plotly_charts.map((chartJson, i) => (
+                    <PlotlyChart key={i} chartJson={chartJson} />
+                  ))}
+                </div>
+              )}
+
+              {/* Static PNG Charts (fallback) */}
               {result.charts && result.charts.length > 0 && (
                 <div style={styles.section}>
-                  <h3 style={styles.sectionTitle}>📉 Charts</h3>
+                  <h3 style={styles.sectionTitle}>📊 Charts</h3>
                   {result.charts.map((chart, i) => (
                     <img
                       key={i}
@@ -707,17 +695,13 @@ export default function App() {
               {result.recommendations && (
                 <div style={styles.recommendationsCard}>
                   <div style={styles.recommendationsHeader}>
-                    <h3 style={styles.recommendationsTitle}>
-                      💡 Business Recommendations
-                    </h3>
+                    <h3 style={styles.recommendationsTitle}>💡 Business Recommendations</h3>
                     <button onClick={handleCopy} style={styles.copyButton}>
                       {copySuccess ? "✅ Copied!" : "📋 Copy"}
                     </button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown>
-                      {result.recommendations}
-                    </ReactMarkdown>
+                    <ReactMarkdown>{result.recommendations}</ReactMarkdown>
                   </div>
                 </div>
               )}
@@ -778,157 +762,42 @@ export default function App() {
 }
 
 const styles = {
-  container: {
-    minHeight: "100vh",
-    backgroundColor: "#0f172a",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    padding: "40px 20px",
-    fontFamily: "'Segoe UI', sans-serif",
-  },
-  card: {
-    backgroundColor: "#1e293b",
-    borderRadius: "16px",
-    padding: "40px",
-    width: "100%",
-    maxWidth: "720px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-  },
+  container: { minHeight: "100vh", backgroundColor: "#0f172a", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 20px", fontFamily: "'Segoe UI', sans-serif" },
+  card: { backgroundColor: "#1e293b", borderRadius: "16px", padding: "40px", width: "100%", maxWidth: "720px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" },
   title: { color: "#f8fafc", fontSize: "28px", marginBottom: "8px" },
   subtitle: { color: "#94a3b8", marginBottom: "32px", fontSize: "15px" },
-  historyContainer: {
-    marginBottom: "24px",
-    padding: "12px",
-    backgroundColor: "#0f172a",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-  },
+  historyContainer: { marginBottom: "24px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #334155" },
   historyLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
   historyList: { display: "flex", flexDirection: "column", gap: "6px" },
-  historyItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 12px",
-    backgroundColor: "#1e293b",
-    border: "1px solid #334155",
-    borderRadius: "6px",
-    cursor: "pointer",
-    textAlign: "left",
-  },
+  historyItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "6px", cursor: "pointer", textAlign: "left" },
   historyFile: { color: "#cbd5e1", fontSize: "12px" },
   historyTime: { color: "#64748b", fontSize: "11px" },
   detecting: { color: "#6366f1", fontSize: "12px", marginTop: "8px", fontStyle: "italic" },
-  detectionCard: {
-    marginTop: "10px",
-    padding: "12px",
-    backgroundColor: "#0f172a",
-    borderRadius: "8px",
-    border: "1px solid #6366f1",
-  },
+  detectionCard: { marginTop: "10px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #6366f1" },
   detectionTitle: { color: "#6366f1", fontSize: "13px", fontWeight: "600", marginBottom: "4px" },
   detectionDetail: { color: "#94a3b8", fontSize: "12px", marginBottom: "4px" },
   detectionReasoning: { color: "#64748b", fontSize: "12px", fontStyle: "italic" },
   field: { marginBottom: "20px" },
   label: { display: "block", color: "#cbd5e1", marginBottom: "8px", fontSize: "14px", fontWeight: "600" },
-  input: {
-    width: "100%",
-    padding: "10px 14px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    backgroundColor: "#0f172a",
-    color: "#f8fafc",
-    fontSize: "14px",
-    boxSizing: "border-box",
-  },
-  textarea: {
-    width: "100%",
-    padding: "10px 14px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    backgroundColor: "#0f172a",
-    color: "#f8fafc",
-    fontSize: "14px",
-    minHeight: "80px",
-    boxSizing: "border-box",
-    resize: "vertical",
-  },
-  button: {
-    width: "100%",
-    padding: "14px",
-    backgroundColor: "#6366f1",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "16px",
-    fontWeight: "600",
-    cursor: "pointer",
-    marginTop: "8px",
-  },
-  buttonDisabled: {
-    width: "100%",
-    padding: "14px",
-    backgroundColor: "#334155",
-    color: "#94a3b8",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "16px",
-    fontWeight: "600",
-    cursor: "not-allowed",
-    marginTop: "8px",
-  },
-  exportButton: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#0f172a",
-    color: "#6366f1",
-    border: "2px solid #6366f1",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    marginTop: "16px",
-  },
-  exportButtonDisabled: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#0f172a",
-    color: "#334155",
-    border: "2px solid #334155",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "not-allowed",
-    marginTop: "16px",
-  },
+  input: { width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "14px", boxSizing: "border-box" },
+  textarea: { width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "14px", minHeight: "80px", boxSizing: "border-box", resize: "vertical" },
+  button: { width: "100%", padding: "14px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
+  buttonDisabled: { width: "100%", padding: "14px", backgroundColor: "#334155", color: "#94a3b8", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "not-allowed", marginTop: "8px" },
+  exportButton: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#6366f1", border: "2px solid #6366f1", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginTop: "16px" },
+  exportButtonDisabled: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "not-allowed", marginTop: "16px" },
   error: { color: "#f87171", marginTop: "16px", fontSize: "14px" },
   results: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
   resultsTitle: { color: "#f8fafc", fontSize: "20px", marginBottom: "8px" },
   meta: { color: "#64748b", fontSize: "13px", marginBottom: "20px" },
   section: { marginBottom: "32px" },
   sectionTitle: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px", marginTop: "24px" },
+  chartHint: { color: "#64748b", fontSize: "12px", marginBottom: "12px", fontStyle: "italic" },
   markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
   chart: { width: "100%", borderRadius: "8px", marginBottom: "16px", border: "1px solid #334155" },
-  recommendationsCard: {
-    marginTop: "32px",
-    backgroundColor: "#0f172a",
-    borderRadius: "12px",
-    padding: "24px",
-    border: "1px solid #6366f1",
-  },
+  recommendationsCard: { marginTop: "32px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "1px solid #6366f1" },
   recommendationsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
   recommendationsTitle: { color: "#6366f1", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
-  copyButton: {
-    padding: "6px 12px",
-    backgroundColor: "#1e293b",
-    color: "#6366f1",
-    border: "1px solid #6366f1",
-    borderRadius: "8px",
-    fontSize: "12px",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
+  copyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
   chatContainer: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
   chatTitle: { color: "#f8fafc", fontSize: "18px", marginBottom: "8px" },
   chatSubtitle: { color: "#64748b", fontSize: "13px", marginBottom: "16px" },
@@ -938,46 +807,11 @@ const styles = {
   bubbleLabel: { fontSize: "11px", color: "#64748b", marginBottom: "6px", fontWeight: "600", textTransform: "uppercase" },
   thinking: { color: "#64748b", fontSize: "14px", fontStyle: "italic" },
   chatInputRow: { display: "flex", gap: "8px" },
-  chatInput: {
-    flex: 1,
-    padding: "10px 14px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    backgroundColor: "#0f172a",
-    color: "#f8fafc",
-    fontSize: "14px",
-  },
-  sendButton: {
-    padding: "10px 20px",
-    backgroundColor: "#6366f1",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-  },
-  sendButtonDisabled: {
-    padding: "10px 20px",
-    backgroundColor: "#334155",
-    color: "#64748b",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "not-allowed",
-  },
+  chatInput: { flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "14px" },
+  sendButton: { padding: "10px 20px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer" },
+  sendButtonDisabled: { padding: "10px 20px", backgroundColor: "#334155", color: "#64748b", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "not-allowed" },
   suggestedPrompts: { marginTop: "10px" },
   suggestedLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
   promptButtons: { display: "flex", flexWrap: "wrap", gap: "8px" },
-  promptButton: {
-    padding: "6px 12px",
-    backgroundColor: "#0f172a",
-    color: "#6366f1",
-    border: "1px solid #6366f1",
-    borderRadius: "20px",
-    fontSize: "12px",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
+  promptButton: { padding: "6px 12px", backgroundColor: "#0f172a", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "20px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
 };
