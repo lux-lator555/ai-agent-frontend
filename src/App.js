@@ -133,14 +133,15 @@ function extractMetrics(summary) {
     { pattern: /k-?means/i, name: "K-Means" },
   ];
 
-  const metricPatterns = [
-    { pattern: /accuracy[:\s*|**]*([0-9.]+)/i, key: "Accuracy" },
-    { pattern: /precision[:\s*|**]*([0-9.]+)/i, key: "Precision" },
-    { pattern: /recall[:\s*|**]*([0-9.]+)/i, key: "Recall" },
-    { pattern: /f1[- ]?score[:\s*|**]*([0-9.]+)/i, key: "F1 Score" },
-    { pattern: /r2[:\s*|**]*([0-9.]+)/i, key: "R² Score" },
-    { pattern: /rmse[:\s*|**]*([0-9.]+)/i, key: "RMSE" },
-    { pattern: /mae[:\s*|**]*([0-9.]+)/i, key: "MAE" },
+const metricPatterns = [
+    { pattern: /accuracy[^0-9]*([0-9.]+)%?/i, key: "Accuracy" },
+    { pattern: /precision[^0-9]*([0-9.]+)%?/i, key: "Precision" },
+    { pattern: /recall[^0-9]*([0-9.]+)%?/i, key: "Recall" },
+    { pattern: /f1[- ]?score[^0-9]*([0-9.]+)%?/i, key: "F1 Score" },
+    { pattern: /roc[- ]?auc[^0-9]*([0-9.]+)%?/i, key: "ROC-AUC" },
+    { pattern: /r2[^0-9]*([0-9.]+)%?/i, key: "R² Score" },
+    { pattern: /rmse[^0-9]*([0-9.]+)%?/i, key: "RMSE" },
+    { pattern: /mae[^0-9]*([0-9.]+)%?/i, key: "MAE" },
   ];
 
   const allMatches = [];
@@ -163,10 +164,12 @@ function extractMetrics(summary) {
     if (!models[modelName]) models[modelName] = {};
 
     for (const { pattern, key } of metricPatterns) {
-      const match = section.match(pattern);
+const match = section.match(pattern);
       if (match) {
-        const val = parseFloat(match[1]);
-        if (!isNaN(val) && val <= 1000) {
+        let val = parseFloat(match[1]);
+        // Convert percentage to decimal if needed
+        if (val > 1 && val <= 100) val = val / 100;
+        if (!isNaN(val) && val <= 1) {
           models[modelName][key] = val.toFixed(4);
         }
       }
