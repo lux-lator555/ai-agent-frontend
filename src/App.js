@@ -92,16 +92,20 @@ function PlotlyChart({ chartJson }) {
       }
     };
 
-    const renderChart = () => {
-      try {
-        const data = JSON.parse(chartJson);
-        window.Plotly.newPlot(ref.current, data.data, {
-          ...data.layout,
-          paper_bgcolor: "#0f172a",
-          plot_bgcolor: "#0f172a",
-          font: { color: "#94a3b8" },
-          margin: { t: 40, r: 20, b: 40, l: 60 },
-        }, { responsive: true });
+const renderChart = () => {
+  try {
+    const data = JSON.parse(chartJson);
+    window.Plotly.newPlot(ref.current, data.data, {
+      ...data.layout,
+      paper_bgcolor: "#0f172a",
+      plot_bgcolor: "#1e293b",
+      font: { color: "#94a3b8", size: 12 },
+      margin: { t: 60, r: 40, b: 80, l: 100 },
+      height: 450,
+      xaxis: { ...data.layout?.xaxis, color: "#94a3b8", gridcolor: "#334155" },
+      yaxis: { ...data.layout?.yaxis, color: "#94a3b8", gridcolor: "#334155" },
+      colorway: ["#6366f1", "#4ade80", "#fbbf24", "#f87171", "#38bdf8"],
+    }, { responsive: true, displayModeBar: true });
       } catch (e) {
         console.error("Plotly render error:", e);
       }
