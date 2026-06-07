@@ -133,15 +133,15 @@ function extractMetrics(summary) {
     { pattern: /k-?means/i, name: "K-Means" },
   ];
 
-const metricPatterns = [
-    { pattern: /accuracy[^0-9]*([0-9.]+)%?/i, key: "Accuracy" },
-    { pattern: /precision[^0-9]*([0-9.]+)%?/i, key: "Precision" },
-    { pattern: /recall[^0-9]*([0-9.]+)%?/i, key: "Recall" },
-    { pattern: /f1[- ]?score[^0-9]*([0-9.]+)%?/i, key: "F1 Score" },
-    { pattern: /roc[- ]?auc[^0-9]*([0-9.]+)%?/i, key: "ROC-AUC" },
-    { pattern: /r2[^0-9]*([0-9.]+)%?/i, key: "R² Score" },
-    { pattern: /rmse[^0-9]*([0-9.]+)%?/i, key: "RMSE" },
-    { pattern: /mae[^0-9]*([0-9.]+)%?/i, key: "MAE" },
+  const metricPatterns = [
+    { pattern: /\baccuracy[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Accuracy" },
+    { pattern: /\bprecision[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Precision" },
+    { pattern: /\brecall[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Recall" },
+    { pattern: /\bf1[- ]?score[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "F1 Score" },
+    { pattern: /\broc[- ]?auc[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "ROC-AUC" },
+    { pattern: /\br2[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "R² Score" },
+    { pattern: /\brmse[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "RMSE" },
+    { pattern: /\bmae[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "MAE" },
   ];
 
   const allMatches = [];
@@ -164,13 +164,17 @@ const metricPatterns = [
     if (!models[modelName]) models[modelName] = {};
 
     for (const { pattern, key } of metricPatterns) {
-const match = section.match(pattern);
+      const match = section.match(pattern);
       if (match) {
         let val = parseFloat(match[1]);
-        // Convert percentage to decimal if needed
+        // Convert percentage to decimal if value > 1
         if (val > 1 && val <= 100) val = val / 100;
-        if (!isNaN(val) && val <= 1) {
-          models[modelName][key] = val.toFixed(4);
+        // Only accept valid metric values between 0 and 1
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          // Don't overwrite with a worse value
+          if (!models[modelName][key]) {
+            models[modelName][key] = val.toFixed(4);
+          }
         }
       }
     }
