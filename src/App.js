@@ -75,51 +75,20 @@ const loaderStyles = {
   message: { color: "#6366f1", fontSize: "13px", fontStyle: "italic", marginTop: "12px", minHeight: "20px" },
 };
 
-function PlotlyChart({ chartJson }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!ref.current || !chartJson) return;
-
-    const loadPlotly = async () => {
-      if (!window.Plotly) {
-        const script = document.createElement("script");
-        script.src = "https://cdn.plot.ly/plotly-2.27.0.min.js";
-        script.onload = () => renderChart();
-        document.head.appendChild(script);
-      } else {
-        renderChart();
-      }
-    };
-
-const renderChart = () => {
-  try {
-    const data = JSON.parse(chartJson);
-    window.Plotly.newPlot(ref.current, data.data, {
-      ...data.layout,
-      paper_bgcolor: "#0f172a",
-      plot_bgcolor: "#1e293b",
-      font: { color: "#94a3b8", size: 12 },
-      margin: { t: 60, r: 40, b: 80, l: 100 },
-      height: 450,
-      xaxis: { ...data.layout?.xaxis, color: "#94a3b8", gridcolor: "#334155" },
-      yaxis: { ...data.layout?.yaxis, color: "#94a3b8", gridcolor: "#334155" },
-      colorway: ["#6366f1", "#4ade80", "#fbbf24", "#f87171", "#38bdf8"],
-    }, { responsive: true, displayModeBar: true });
-      } catch (e) {
-        console.error("Plotly render error:", e);
-      }
-    };
-
-    loadPlotly();
-  }, [chartJson]);
-
-  return (
-    <div
-      ref={ref}
-      style={{ width: "100%", minHeight: "400px", borderRadius: "8px", border: "1px solid #334155", marginBottom: "16px" }}
-    />
-  );
+function extractSection(text, startMarker, endMarker) {
+  if (!text) return "";
+  let start = 0;
+  let end = text.length;
+  if (startMarker) {
+    const startIdx = text.indexOf(startMarker);
+    if (startIdx === -1) return "";
+    start = startIdx;
+  }
+  if (endMarker) {
+    const endIdx = text.indexOf(endMarker);
+    if (endIdx !== -1) end = endIdx;
+  }
+  return text.substring(start, end).trim();
 }
 
 function extractMetrics(summary) {
@@ -167,11 +136,8 @@ function extractMetrics(summary) {
       const match = section.match(pattern);
       if (match) {
         let val = parseFloat(match[1]);
-        // Convert percentage to decimal if value > 1
         if (val > 1 && val <= 100) val = val / 100;
-        // Only accept valid metric values between 0 and 1
         if (!isNaN(val) && val >= 0 && val <= 1) {
-          // Don't overwrite with a worse value
           if (!models[modelName][key]) {
             models[modelName][key] = val.toFixed(4);
           }
@@ -378,6 +344,7 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [execCopySuccess, setExecCopySuccess] = useState(false);
   const [detection, setDetection] = useState(null);
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
@@ -545,10 +512,25 @@ export default function App() {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
+  const handleExecCopy = () => {
+    const execSummary = extractSection(result.recommendations, "Executive Summary", null);
+    navigator.clipboard.writeText(execSummary);
+    setExecCopySuccess(true);
+    setTimeout(() => setExecCopySuccess(false), 2000);
+  };
+
   const cleanSummary = (text) => {
     if (!text) return "";
     return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
   };
+
+  const mainRecommendations = result?.recommendations
+    ? extractSection(result.recommendations, null, "Executive Summary")
+    : "";
+
+  const executiveSummary = result?.recommendations
+    ? extractSection(result.recommendations, "Executive Summary", null)
+    : "";
 
   return (
     <div style={styles.container}>
@@ -620,10 +602,10 @@ export default function App() {
             <p style={styles.suggestedLabel}>Suggested prompts:</p>
             <div style={styles.promptButtons}>
               {[
-                "Predict which customers are likely to churn. Run logistic regression and random forest, show feature importance, accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts. Generate SHAP values to explain which features drive churn predictions.",
+                "Predict which customers are likely to churn. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix charts and feature importance charts. Use SHAP to explain the top 5 features driving churn predictions.",
                 "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts. Use SHAP to explain salary predictions.",
                 "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
-                "Predict which shipments are likely to be delayed. Run logistic regression and random forest, show feature importance, model accuracy, precision, recall and F1 score, generate confusion matrices and feature importance charts. Use SHAP to explain delay predictions."
+                "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions."
               ].map((prompt, i) => (
                 <button
                   key={i}
@@ -677,21 +659,9 @@ export default function App() {
 
               <ConfidenceScores scores={result.confidence_scores} />
 
-              {/* Plotly Interactive Charts */}
-              {result.plotly_charts && result.plotly_charts.length > 0 && (
-                <div style={styles.section}>
-                  <h3 style={styles.sectionTitle}>📉 Interactive Charts</h3>
-                  <p style={styles.chartHint}>💡 Hover over charts to explore data points. Click legend items to toggle series.</p>
-                  {result.plotly_charts.map((chartJson, i) => (
-                    <PlotlyChart key={i} chartJson={chartJson} />
-                  ))}
-                </div>
-              )}
-
-              {/* Static PNG Charts (fallback) */}
               {result.charts && result.charts.length > 0 && (
                 <div style={styles.section}>
-                  <h3 style={styles.sectionTitle}>📊 Charts</h3>
+                  <h3 style={styles.sectionTitle}>📉 Charts</h3>
                   {result.charts.map((chart, i) => (
                     <img
                       key={i}
@@ -703,7 +673,8 @@ export default function App() {
                 </div>
               )}
 
-              {result.recommendations && (
+              {/* Main Business Recommendations */}
+              {mainRecommendations && (
                 <div style={styles.recommendationsCard}>
                   <div style={styles.recommendationsHeader}>
                     <h3 style={styles.recommendationsTitle}>💡 Business Recommendations</h3>
@@ -712,7 +683,22 @@ export default function App() {
                     </button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown>{result.recommendations}</ReactMarkdown>
+                    <ReactMarkdown>{mainRecommendations}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {/* Executive Summary */}
+              {executiveSummary && (
+                <div style={styles.executiveCard}>
+                  <div style={styles.executiveHeader}>
+                    <h3 style={styles.executiveTitle}>👔 Executive Summary</h3>
+                    <button onClick={handleExecCopy} style={styles.execCopyButton}>
+                      {execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}
+                    </button>
+                  </div>
+                  <div style={styles.markdownBody}>
+                    <ReactMarkdown>{executiveSummary}</ReactMarkdown>
                   </div>
                 </div>
               )}
@@ -802,13 +788,16 @@ const styles = {
   meta: { color: "#64748b", fontSize: "13px", marginBottom: "20px" },
   section: { marginBottom: "32px" },
   sectionTitle: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px", marginTop: "24px" },
-  chartHint: { color: "#64748b", fontSize: "12px", marginBottom: "12px", fontStyle: "italic" },
   markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
   chart: { width: "100%", borderRadius: "8px", marginBottom: "16px", border: "1px solid #334155" },
   recommendationsCard: { marginTop: "32px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "1px solid #6366f1" },
   recommendationsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
   recommendationsTitle: { color: "#6366f1", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
   copyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
+  executiveCard: { marginTop: "16px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "2px solid #4ade80" },
+  executiveHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
+  executiveTitle: { color: "#4ade80", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
+  execCopyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#4ade80", border: "1px solid #4ade80", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
   chatContainer: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
   chatTitle: { color: "#f8fafc", fontSize: "18px", marginBottom: "8px" },
   chatSubtitle: { color: "#64748b", fontSize: "13px", marginBottom: "16px" },
