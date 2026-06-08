@@ -42,3 +42,30 @@ hr {
   border-color: #334155;
   margin: 16px 0;
 }
+
+/* Table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+th {
+  background-color: #0f172a;
+  color: #cbd5e1;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 2px solid #334155;
+  font-weight: 600;
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #1e293b;
+  color: #94a3b8;
+}
+
+tr:hover td {
+  background-color: #1e293b;
+}

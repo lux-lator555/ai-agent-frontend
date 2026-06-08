@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import remarkGfm from "remark-gfm";
 
 const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
 
@@ -651,7 +652,7 @@ export default function App() {
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
                 <div style={styles.markdownBody}>
-                  <ReactMarkdown>{cleanSummary(result.summary)}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
                 </div>
               </div>
 
@@ -683,7 +684,7 @@ export default function App() {
                     </button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown>{mainRecommendations}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
                   </div>
                 </div>
               )}
@@ -698,7 +699,7 @@ export default function App() {
                     </button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown>{executiveSummary}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
                   </div>
                 </div>
               )}
@@ -718,7 +719,7 @@ export default function App() {
                         {msg.role === "user" ? "You" : "🤖 Agent"}
                       </div>
                       <div style={styles.markdownBody}>
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
                       </div>
                     </div>
                   ))}
