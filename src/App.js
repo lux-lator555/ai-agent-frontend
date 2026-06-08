@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import remarkGfm from "remark-gfm";
 
 const RENDER_URL = "https://ai-data-analyst-agent-t8b3.onrender.com";
 
@@ -29,38 +29,21 @@ function RobotLoader() {
     const moveRobot = setInterval(() => {
       setPosition((prev) => {
         const next = prev + directionRef.value * 2;
-        if (next >= 90) {
-          directionRef.value = -1;
-          setFlip(true);
-        }
-        if (next <= 0) {
-          directionRef.value = 1;
-          setFlip(false);
-        }
+        if (next >= 90) { directionRef.value = -1; setFlip(true); }
+        if (next <= 0) { directionRef.value = 1; setFlip(false); }
         return Math.max(0, Math.min(90, next));
       });
     }, 50);
-
     const rotateMessage = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
     }, 3000);
-
-    return () => {
-      clearInterval(moveRobot);
-      clearInterval(rotateMessage);
-    };
+    return () => { clearInterval(moveRobot); clearInterval(rotateMessage); };
   }, [directionRef]);
 
   return (
     <div style={loaderStyles.container}>
       <div style={loaderStyles.track}>
-        <div style={{
-          ...loaderStyles.robot,
-          left: `${position}%`,
-          transform: flip ? "scaleX(-1)" : "scaleX(1)",
-        }}>
-          🤖
-        </div>
+        <div style={{ ...loaderStyles.robot, left: `${position}%`, transform: flip ? "scaleX(-1)" : "scaleX(1)" }}>🤖</div>
         <div style={loaderStyles.trackLine} />
       </div>
       <p style={loaderStyles.message}>{STATUS_MESSAGES[messageIndex]}</p>
@@ -95,14 +78,14 @@ function extractSection(text, startMarker, endMarker) {
 function extractMetrics(summary) {
   const models = {};
   const text = summary;
-
   const modelPatterns = [
     { pattern: /logistic regression/i, name: "Logistic Regression" },
     { pattern: /random forest/i, name: "Random Forest" },
     { pattern: /linear regression/i, name: "Linear Regression" },
     { pattern: /k-?means/i, name: "K-Means" },
+    { pattern: /xgboost/i, name: "XGBoost" },
+    { pattern: /lightgbm/i, name: "LightGBM" },
   ];
-
   const metricPatterns = [
     { pattern: /\baccuracy[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Accuracy" },
     { pattern: /\bprecision[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Precision" },
@@ -113,7 +96,6 @@ function extractMetrics(summary) {
     { pattern: /\brmse[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "RMSE" },
     { pattern: /\bmae[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "MAE" },
   ];
-
   const allMatches = [];
   for (const { pattern, name } of modelPatterns) {
     const regex = new RegExp(pattern.source, 'gi');
@@ -122,26 +104,20 @@ function extractMetrics(summary) {
       allMatches.push({ index: match.index, name });
     }
   }
-
   allMatches.sort((a, b) => a.index - b.index);
-
   for (let i = 0; i < allMatches.length; i++) {
     const start = allMatches[i].index;
     const end = allMatches[i + 1]?.index || text.length;
     const section = text.substring(start, end);
     const modelName = allMatches[i].name;
-
     if (!models[modelName]) models[modelName] = {};
-
     for (const { pattern, key } of metricPatterns) {
       const match = section.match(pattern);
       if (match) {
         let val = parseFloat(match[1]);
         if (val > 1 && val <= 100) val = val / 100;
         if (!isNaN(val) && val >= 0 && val <= 1) {
-          if (!models[modelName][key]) {
-            models[modelName][key] = val.toFixed(4);
-          }
+          if (!models[modelName][key]) models[modelName][key] = val.toFixed(4);
         }
       }
     }
@@ -154,7 +130,6 @@ function ModelComparisonTable({ summary }) {
   const modelNames = Object.keys(metrics);
   if (modelNames.length < 2) return null;
   const allMetrics = [...new Set(modelNames.flatMap((m) => Object.keys(metrics[m])))];
-
   return (
     <div style={tableStyles.container}>
       <h3 style={tableStyles.title}>📊 Model Comparison</h3>
@@ -174,11 +149,7 @@ function ModelComparisonTable({ summary }) {
                 <tr key={metric}>
                   <td style={tableStyles.td}>{metric}</td>
                   {modelNames.map((m, i) => (
-                    <td key={m} style={{
-                      ...tableStyles.td,
-                      color: values[i] === best ? "#6366f1" : "#94a3b8",
-                      fontWeight: values[i] === best ? "700" : "400",
-                    }}>
+                    <td key={m} style={{ ...tableStyles.td, color: values[i] === best ? "#6366f1" : "#94a3b8", fontWeight: values[i] === best ? "700" : "400" }}>
                       {metrics[m][metric] || "—"}{values[i] === best && " ✓"}
                     </td>
                   ))}
@@ -203,35 +174,16 @@ const tableStyles = {
 
 function DataQualityReport({ report }) {
   if (!report) return null;
-  const hasIssues = Object.keys(report.missing_values).length > 0 ||
-    Object.keys(report.outliers).length > 0 || report.duplicates > 0;
-
+  const hasIssues = Object.keys(report.missing_values).length > 0 || Object.keys(report.outliers).length > 0 || report.duplicates > 0;
   return (
     <div style={qualityStyles.container}>
       <h3 style={qualityStyles.title}>🔍 Data Quality Report</h3>
       <div style={qualityStyles.grid}>
-        <div style={qualityStyles.stat}>
-          <span style={qualityStyles.statValue}>{report.total_rows}</span>
-          <span style={qualityStyles.statLabel}>Total Rows</span>
-        </div>
-        <div style={qualityStyles.stat}>
-          <span style={qualityStyles.statValue}>{report.total_columns}</span>
-          <span style={qualityStyles.statLabel}>Columns</span>
-        </div>
-        <div style={qualityStyles.stat}>
-          <span style={{ ...qualityStyles.statValue, color: report.duplicates > 0 ? "#f87171" : "#4ade80" }}>
-            {report.duplicates}
-          </span>
-          <span style={qualityStyles.statLabel}>Duplicates</span>
-        </div>
-        <div style={qualityStyles.stat}>
-          <span style={{ ...qualityStyles.statValue, color: Object.keys(report.missing_values).length > 0 ? "#fbbf24" : "#4ade80" }}>
-            {Object.keys(report.missing_values).length}
-          </span>
-          <span style={qualityStyles.statLabel}>Cols w/ Missing</span>
-        </div>
+        <div style={qualityStyles.stat}><span style={qualityStyles.statValue}>{report.total_rows}</span><span style={qualityStyles.statLabel}>Total Rows</span></div>
+        <div style={qualityStyles.stat}><span style={qualityStyles.statValue}>{report.total_columns}</span><span style={qualityStyles.statLabel}>Columns</span></div>
+        <div style={qualityStyles.stat}><span style={{ ...qualityStyles.statValue, color: report.duplicates > 0 ? "#f87171" : "#4ade80" }}>{report.duplicates}</span><span style={qualityStyles.statLabel}>Duplicates</span></div>
+        <div style={qualityStyles.stat}><span style={{ ...qualityStyles.statValue, color: Object.keys(report.missing_values).length > 0 ? "#fbbf24" : "#4ade80" }}>{Object.keys(report.missing_values).length}</span><span style={qualityStyles.statLabel}>Cols w/ Missing</span></div>
       </div>
-
       {Object.keys(report.missing_values).length > 0 && (
         <div style={qualityStyles.section}>
           <p style={qualityStyles.sectionTitle}>⚠️ Missing Values</p>
@@ -243,7 +195,6 @@ function DataQualityReport({ report }) {
           ))}
         </div>
       )}
-
       {Object.keys(report.outliers).length > 0 && (
         <div style={qualityStyles.section}>
           <p style={qualityStyles.sectionTitle}>📊 Outliers Detected</p>
@@ -255,12 +206,9 @@ function DataQualityReport({ report }) {
           ))}
         </div>
       )}
-
       <div style={qualityStyles.section}>
         <p style={qualityStyles.sectionTitle}>{hasIssues ? "💡 Recommendations" : "✅ Data Quality"}</p>
-        {report.recommendations.map((rec, i) => (
-          <p key={i} style={qualityStyles.recommendation}>{rec}</p>
-        ))}
+        {report.recommendations.map((rec, i) => (<p key={i} style={qualityStyles.recommendation}>{rec}</p>))}
       </div>
     </div>
   );
@@ -283,36 +231,25 @@ const qualityStyles = {
 
 function ConfidenceScores({ scores }) {
   if (!scores || !scores.scores || scores.scores.length === 0) return null;
-
   const colorMap = { high: "#4ade80", medium: "#fbbf24", low: "#f87171" };
   const emojiMap = { high: "🟢", medium: "🟡", low: "🔴" };
-
   return (
     <div style={confidenceStyles.container}>
       <div style={confidenceStyles.header}>
         <h3 style={confidenceStyles.title}>🎯 Confidence Assessment</h3>
-        <span style={{
-          ...confidenceStyles.badge,
-          backgroundColor: colorMap[scores.overall_confidence] + "20",
-          color: colorMap[scores.overall_confidence],
-          border: `1px solid ${colorMap[scores.overall_confidence]}`,
-        }}>
+        <span style={{ ...confidenceStyles.badge, backgroundColor: colorMap[scores.overall_confidence] + "20", color: colorMap[scores.overall_confidence], border: `1px solid ${colorMap[scores.overall_confidence]}` }}>
           {emojiMap[scores.overall_confidence]} Overall: {scores.overall_confidence.toUpperCase()}
         </span>
       </div>
-
       {scores.scores.map((item, i) => (
         <div key={i} style={confidenceStyles.item}>
           <div style={confidenceStyles.itemHeader}>
             <span style={confidenceStyles.finding}>{item.finding}</span>
-            <span style={{ ...confidenceStyles.itemBadge, color: colorMap[item.confidence] }}>
-              {emojiMap[item.confidence]} {item.confidence.toUpperCase()}
-            </span>
+            <span style={{ ...confidenceStyles.itemBadge, color: colorMap[item.confidence] }}>{emojiMap[item.confidence]} {item.confidence.toUpperCase()}</span>
           </div>
           <p style={confidenceStyles.reason}>{item.reason}</p>
         </div>
       ))}
-
       {scores.caveats && <p style={confidenceStyles.caveats}>⚠️ {scores.caveats}</p>}
     </div>
   );
@@ -355,19 +292,13 @@ export default function App() {
     setFile(selectedFile);
     setDetection(null);
     setGoal("");
-
     if (selectedFile && apiKey) {
       setDetecting(true);
       try {
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("api_key", apiKey);
-
-        const response = await fetch(`${RENDER_URL}/autodetect`, {
-          method: "POST",
-          body: formData,
-        });
-
+        const response = await fetch(`${RENDER_URL}/autodetect`, { method: "POST", body: formData });
         if (response.ok) {
           const data = await response.json();
           setDetection(data);
@@ -382,42 +313,21 @@ export default function App() {
   };
 
   const handleAnalyze = async () => {
-    if (!file || !goal || !apiKey) {
-      setError("Please fill in all fields and upload a CSV.");
-      return;
-    }
-
+    if (!file || !goal || !apiKey) { setError("Please fill in all fields and upload a CSV."); return; }
     setLoading(true);
     setError(null);
     setResult(null);
     setChatHistory([]);
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("goal", goal);
     formData.append("api_key", apiKey);
-
     try {
-      const response = await fetch(`${RENDER_URL}/analyze`, {
-        method: "POST",
-        body: formData,
-      });
-
+      const response = await fetch(`${RENDER_URL}/analyze`, { method: "POST", body: formData });
       if (!response.ok) throw new Error("Server error — please try again.");
       const data = await response.json();
       setResult(data);
-
-      setHistory((prev) => [
-        {
-          id: Date.now(),
-          filename: file.name,
-          goal: goal.substring(0, 60) + (goal.length > 60 ? "..." : ""),
-          timestamp: new Date().toLocaleTimeString(),
-          data,
-        },
-        ...prev.slice(0, 2),
-      ]);
-
+      setHistory((prev) => [{ id: Date.now(), filename: file.name, goal: goal.substring(0, 60) + (goal.length > 60 ? "..." : ""), timestamp: new Date().toLocaleTimeString(), data }, ...prev.slice(0, 2)]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -427,41 +337,23 @@ export default function App() {
 
   const handleFollowUp = async () => {
     if (!chatInput.trim() || !result) return;
-
     const question = chatInput.trim();
     setChatInput("");
     setChatLoading(true);
-
     const newHistory = [...chatHistory, { role: "user", content: question }];
     setChatHistory(newHistory);
-
     try {
       const response = await fetch(`${RENDER_URL}/followup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          original_summary: result.summary,
-          original_recommendations: result.recommendations,
-          conversation_history: chatHistory,
-          api_key: apiKey,
-        }),
+        body: JSON.stringify({ question, original_summary: result.summary, original_recommendations: result.recommendations, conversation_history: chatHistory, api_key: apiKey }),
       });
-
       if (!response.ok) throw new Error("Server error — please try again.");
       const data = await response.json();
-
       setChatHistory([...newHistory, { role: "assistant", content: data.response }]);
-
-      setTimeout(() => {
-        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-
+      setTimeout(() => { chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, 100);
     } catch (err) {
-      setChatHistory([
-        ...newHistory,
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
-      ]);
+      setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
     } finally {
       setChatLoading(false);
     }
@@ -470,35 +362,24 @@ export default function App() {
   const handleExportPDF = async () => {
     if (!resultsRef.current) return;
     setExporting(true);
-
     try {
-      const canvas = await html2canvas(resultsRef.current, {
-        scale: 2,
-        backgroundColor: "#1e293b",
-        useCORS: true,
-      });
-
+      const canvas = await html2canvas(resultsRef.current, { scale: 2, backgroundColor: "#1e293b", useCORS: true });
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
       let heightLeft = imgHeight;
       let position = 0;
-
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-
       pdf.save("AI_Analysis_Report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
@@ -537,20 +418,14 @@ export default function App() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>🤖 AI Data Analyst Agent</h1>
-        <p style={styles.subtitle}>
-          Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.
-        </p>
+        <p style={styles.subtitle}>Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.</p>
 
         {history.length > 0 && (
           <div style={styles.historyContainer}>
             <p style={styles.historyLabel}>Recent analyses:</p>
             <div style={styles.historyList}>
               {history.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setResult(item.data); setChatHistory([]); }}
-                  style={styles.historyItem}
-                >
+                <button key={item.id} onClick={() => { setResult(item.data); setChatHistory([]); }} style={styles.historyItem}>
                   <span style={styles.historyFile}>📁 {item.filename}</span>
                   <span style={styles.historyTime}>{item.timestamp}</span>
                 </button>
@@ -561,31 +436,17 @@ export default function App() {
 
         <div style={styles.field}>
           <label style={styles.label}>Gemini API Key</label>
-          <input
-            type="password"
-            placeholder="Your Gemini API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            style={styles.input}
-          />
+          <input type="password" placeholder="Your Gemini API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={styles.input} />
         </div>
 
         <div style={styles.field}>
           <label style={styles.label}>Upload CSV</label>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            style={styles.input}
-          />
+          <input type="file" accept=".csv" onChange={handleFileChange} style={styles.input} />
           {detecting && <p style={styles.detecting}>🔍 Scanning dataset...</p>}
           {detection && (
             <div style={styles.detectionCard}>
               <p style={styles.detectionTitle}>🎯 Auto-detected: {detection.problem_type}</p>
-              <p style={styles.detectionDetail}>
-                Target: <strong>{detection.target_column || "None (unsupervised)"}</strong> ·
-                Models: <strong>{detection.recommended_models?.join(", ")}</strong>
-              </p>
+              <p style={styles.detectionDetail}>Target: <strong>{detection.target_column || "None (unsupervised)"}</strong> · Models: <strong>{detection.recommended_models?.join(", ")}</strong></p>
               <p style={styles.detectionReasoning}>{detection.reasoning}</p>
             </div>
           )}
@@ -593,12 +454,7 @@ export default function App() {
 
         <div style={styles.field}>
           <label style={styles.label}>Analysis Goal</label>
-          <textarea
-            placeholder="e.g. Identify which customers are likely to churn"
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            style={styles.textarea}
-          />
+          <textarea placeholder="e.g. Identify which customers are likely to churn" value={goal} onChange={(e) => setGoal(e.target.value)} style={styles.textarea} />
           <div style={styles.suggestedPrompts}>
             <p style={styles.suggestedLabel}>Suggested prompts:</p>
             <div style={styles.promptButtons}>
@@ -608,11 +464,7 @@ export default function App() {
                 "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
                 "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions."
               ].map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => setGoal(prompt)}
-                  style={styles.promptButton}
-                >
+                <button key={i} onClick={() => setGoal(prompt)} style={styles.promptButton}>
                   {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay"][i]}
                 </button>
               ))}
@@ -620,11 +472,7 @@ export default function App() {
           </div>
         </div>
 
-        <button
-          onClick={handleAnalyze}
-          disabled={loading}
-          style={loading ? styles.buttonDisabled : styles.button}
-        >
+        <button onClick={handleAnalyze} disabled={loading} style={loading ? styles.buttonDisabled : styles.button}>
           {loading ? "Analyzing..." : "▶ Run Agent"}
         </button>
 
@@ -633,19 +481,13 @@ export default function App() {
 
         {result && (
           <div>
-            <button
-              onClick={handleExportPDF}
-              disabled={exporting}
-              style={exporting ? styles.exportButtonDisabled : styles.exportButton}
-            >
+            <button onClick={handleExportPDF} disabled={exporting} style={exporting ? styles.exportButtonDisabled : styles.exportButton}>
               {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
             </button>
 
             <div ref={resultsRef} style={styles.results}>
               <h2 style={styles.resultsTitle}>📊 Analysis Report</h2>
-              <p style={styles.meta}>
-                {result.rows} rows · {result.columns} columns · {result.turns} agent turns
-              </p>
+              <p style={styles.meta}>{result.rows} rows · {result.columns} columns · {result.turns} agent turns</p>
 
               <DataQualityReport report={result.quality_report} />
 
@@ -657,49 +499,37 @@ export default function App() {
               </div>
 
               <ModelComparisonTable summary={cleanSummary(result.summary)} />
-
               <ConfidenceScores scores={result.confidence_scores} />
 
               {result.charts && result.charts.length > 0 && (
                 <div style={styles.section}>
                   <h3 style={styles.sectionTitle}>📉 Charts</h3>
                   {result.charts.map((chart, i) => (
-                    <img
-                      key={i}
-                      src={`data:image/png;base64,${chart}`}
-                      alt={`Chart ${i + 1}`}
-                      style={styles.chart}
-                    />
+                    <img key={i} src={`data:image/png;base64,${chart}`} alt={`Chart ${i + 1}`} style={styles.chart} />
                   ))}
                 </div>
               )}
 
-              {/* Main Business Recommendations */}
               {mainRecommendations && (
                 <div style={styles.recommendationsCard}>
                   <div style={styles.recommendationsHeader}>
                     <h3 style={styles.recommendationsTitle}>💡 Business Recommendations</h3>
-                    <button onClick={handleCopy} style={styles.copyButton}>
-                      {copySuccess ? "✅ Copied!" : "📋 Copy"}
-                    </button>
+                    <button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainRecommendations}</ReactMarkdown>
                   </div>
                 </div>
               )}
 
-              {/* Executive Summary */}
               {executiveSummary && (
                 <div style={styles.executiveCard}>
                   <div style={styles.executiveHeader}>
                     <h3 style={styles.executiveTitle}>👔 Executive Summary</h3>
-                    <button onClick={handleExecCopy} style={styles.execCopyButton}>
-                      {execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}
-                    </button>
+                    <button onClick={handleExecCopy} style={styles.execCopyButton}>{execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}</button>
                   </div>
                   <div style={styles.markdownBody}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{executiveSummary}</ReactMarkdown>
                   </div>
                 </div>
               )}
@@ -707,19 +537,15 @@ export default function App() {
 
             <div style={styles.chatContainer}>
               <h3 style={styles.chatTitle}>💬 Ask a Follow-Up Question</h3>
-              <p style={styles.chatSubtitle}>
-                Ask anything about the analysis, request clarification, or explore what-if scenarios.
-              </p>
+              <p style={styles.chatSubtitle}>Ask anything about the analysis, request clarification, or explore what-if scenarios.</p>
 
               {chatHistory.length > 0 && (
                 <div style={styles.chatHistory}>
                   {chatHistory.map((msg, i) => (
                     <div key={i} style={msg.role === "user" ? styles.userBubble : styles.agentBubble}>
-                      <div style={styles.bubbleLabel}>
-                        {msg.role === "user" ? "You" : "🤖 Agent"}
-                      </div>
+                      <div style={styles.bubbleLabel}>{msg.role === "user" ? "You" : "🤖 Agent"}</div>
                       <div style={styles.markdownBody}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     </div>
                   ))}
@@ -734,22 +560,8 @@ export default function App() {
               )}
 
               <div style={styles.chatInputRow}>
-                <input
-                  type="text"
-                  placeholder="e.g. Which customers should we contact first?"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleFollowUp()}
-                  style={styles.chatInput}
-                  disabled={chatLoading}
-                />
-                <button
-                  onClick={handleFollowUp}
-                  disabled={chatLoading || !chatInput.trim()}
-                  style={chatLoading || !chatInput.trim() ? styles.sendButtonDisabled : styles.sendButton}
-                >
-                  Send
-                </button>
+                <input type="text" placeholder="e.g. Which customers should we contact first?" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleFollowUp()} style={styles.chatInput} disabled={chatLoading} />
+                <button onClick={handleFollowUp} disabled={chatLoading || !chatInput.trim()} style={chatLoading || !chatInput.trim() ? styles.sendButtonDisabled : styles.sendButton}>Send</button>
               </div>
             </div>
           </div>
