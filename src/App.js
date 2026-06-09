@@ -464,14 +464,15 @@ export default function App() {
   "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
   "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions.",
   "Detect anomalies and outliers in this dataset. Use Isolation Forest and DBSCAN to identify unusual records. Show how many anomalies were found, visualize them in a scatter plot with anomalies highlighted in red, and explain in plain English what makes each anomaly unusual and what business action should be taken.",
-  "Analyze trends in this dataset. Identify date columns and parse them. Calculate month-over-month growth rates, identify seasonality patterns, determine overall trend direction, and forecast the next 3 periods. Generate a time series line chart and a growth rate bar chart. Explain what the trends mean for the business."
+  "Analyze trends in this dataset. Identify date columns and parse them. Calculate month-over-month growth rates, identify seasonality patterns, determine overall trend direction, and forecast the next 3 periods. Generate a time series line chart and a growth rate bar chart. Explain what the trends mean for the business.",
+  "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English."
 ].map((prompt, i) => (
   <button
     key={i}
     onClick={() => setGoal(prompt)}
     style={styles.promptButton}
   >
-    {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis"][i]}
+    {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests"][i]}
   </button>
 ))}
             </div>
