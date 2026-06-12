@@ -86,15 +86,15 @@ function extractMetrics(summary) {
     { pattern: /xgboost/i, name: "XGBoost" },
     { pattern: /lightgbm/i, name: "LightGBM" },
   ];
-  const metricPatterns = [
-    { pattern: /\baccuracy[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Accuracy" },
-    { pattern: /\bprecision[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Precision" },
-    { pattern: /\brecall[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "Recall" },
-    { pattern: /\bf1[- ]?score[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "F1 Score" },
-    { pattern: /\broc[- ]?auc[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "ROC-AUC" },
-    { pattern: /\br2[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "R² Score" },
-    { pattern: /\brmse[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "RMSE" },
-    { pattern: /\bmae[^a-zA-Z]*?([0-9]+\.?[0-9]*)%?/i, key: "MAE" },
+const metricPatterns = [
+    { pattern: /\baccuracy[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Accuracy" },
+    { pattern: /\bprecision[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Precision" },
+    { pattern: /\brecall[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Recall" },
+    { pattern: /\bf1[- ]?score[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "F1 Score" },
+    { pattern: /\broc[- ]?auc[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "ROC-AUC" },
+    { pattern: /\br2[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "R² Score" },
+    { pattern: /\brmse[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "RMSE" },
+    { pattern: /\bmae[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "MAE" },
   ];
   const allMatches = [];
   for (const { pattern, name } of modelPatterns) {
