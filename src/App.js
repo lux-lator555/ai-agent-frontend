@@ -126,6 +126,10 @@ const metricPatterns = [
 }
 
 function ModelComparisonTable({ summary }) {
+  // Check if the summary already contains a markdown table with model metrics
+  const hasMarkdownTable = /\|.*Accuracy.*\|/i.test(summary) || /\|.*Model.*\|.*Accuracy/i.test(summary);
+  if (hasMarkdownTable) return null;
+
   const metrics = extractMetrics(summary);
   const modelNames = Object.keys(metrics);
   if (modelNames.length < 2) return null;
