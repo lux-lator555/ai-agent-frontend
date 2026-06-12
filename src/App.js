@@ -149,7 +149,11 @@ function ModelComparisonTable({ summary }) {
                 <tr key={metric}>
                   <td style={tableStyles.td}>{metric}</td>
                   {modelNames.map((m, i) => (
-                    <td key={m} style={{ ...tableStyles.td, color: values[i] === best ? "#6366f1" : "#94a3b8", fontWeight: values[i] === best ? "700" : "400" }}>
+                    <td key={m} style={{
+                      ...tableStyles.td,
+                      color: values[i] === best ? "#6366f1" : "#94a3b8",
+                      fontWeight: values[i] === best ? "700" : "400",
+                    }}>
                       {metrics[m][metric] || "—"}{values[i] === best && " ✓"}
                     </td>
                   ))}
@@ -237,7 +241,12 @@ function ConfidenceScores({ scores }) {
     <div style={confidenceStyles.container}>
       <div style={confidenceStyles.header}>
         <h3 style={confidenceStyles.title}>🎯 Confidence Assessment</h3>
-        <span style={{ ...confidenceStyles.badge, backgroundColor: colorMap[scores.overall_confidence] + "20", color: colorMap[scores.overall_confidence], border: `1px solid ${colorMap[scores.overall_confidence]}` }}>
+        <span style={{
+          ...confidenceStyles.badge,
+          backgroundColor: colorMap[scores.overall_confidence] + "20",
+          color: colorMap[scores.overall_confidence],
+          border: `1px solid ${colorMap[scores.overall_confidence]}`,
+        }}>
           {emojiMap[scores.overall_confidence]} Overall: {scores.overall_confidence.toUpperCase()}
         </span>
       </div>
@@ -363,29 +372,73 @@ export default function App() {
     if (!resultsRef.current) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(resultsRef.current, { scale: 2, backgroundColor: "#1e293b", useCORS: true });
+      const images = resultsRef.current.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) resolve();
+              else { img.onload = resolve; img.onerror = resolve; }
+            })
+        )
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const canvas = await html2canvas(resultsRef.current, {
+        scale: 2,
+        backgroundColor: "#1e293b",
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        imageTimeout: 15000,
+        onclone: (clonedDoc) => {
+          const clonedImages = clonedDoc.querySelectorAll('img');
+          clonedImages.forEach((img) => {
+            img.style.display = 'block';
+            img.style.visibility = 'visible';
+            img.style.opacity = '1';
+          });
+        }
+      });
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
       let heightLeft = imgHeight;
       let position = 0;
+
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
+
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
+
       pdf.save("AI_Analysis_Report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportModel = () => {
+    if (!result?.model_export) return;
+    const blob = new Blob([JSON.stringify(result.model_export, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "model_export.json";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleCopy = () => {
@@ -458,23 +511,19 @@ export default function App() {
           <div style={styles.suggestedPrompts}>
             <p style={styles.suggestedLabel}>Suggested prompts:</p>
             <div style={styles.promptButtons}>
-{[
-  "Predict which customers are likely to churn. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix charts and feature importance charts. Use SHAP to explain the top 5 features driving churn predictions.",
-  "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts. Use SHAP to explain salary predictions.",
-  "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
-  "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions.",
-  "Detect anomalies and outliers in this dataset. Use Isolation Forest and DBSCAN to identify unusual records. Show how many anomalies were found, visualize them in a scatter plot with anomalies highlighted in red, and explain in plain English what makes each anomaly unusual and what business action should be taken.",
-  "Analyze trends in this dataset. Identify date columns and parse them. Calculate month-over-month growth rates, identify seasonality patterns, determine overall trend direction, and forecast the next 3 periods. Generate a time series line chart and a growth rate bar chart. Explain what the trends mean for the business.",
-  "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English."
-].map((prompt, i) => (
-  <button
-    key={i}
-    onClick={() => setGoal(prompt)}
-    style={styles.promptButton}
-  >
-    {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests"][i]}
-  </button>
-))}
+              {[
+                "Predict which customers are likely to churn. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix charts and feature importance charts. Use SHAP to explain the top 5 features driving churn predictions.",
+                "Predict employee salary based on experience, performance and education. Run linear regression, show which features most strongly predict salary, evaluate with RMSE and R² score, generate feature importance and residual charts. Use SHAP to explain salary predictions.",
+                "Identify distinct customer segments using clustering. Use the elbow method to find optimal clusters, run K-Means, visualize the clusters, and describe each segment's characteristics and recommended marketing strategy.",
+                "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions.",
+                "Detect anomalies and outliers in this dataset. Use Isolation Forest and DBSCAN to identify unusual records. Show how many anomalies were found, visualize them in a scatter plot with anomalies highlighted in red, and explain in plain English what makes each anomaly unusual and what business action should be taken.",
+                "Analyze trends in this dataset. Identify date columns and parse them. Calculate month-over-month growth rates, identify seasonality patterns, determine overall trend direction, and forecast the next 3 periods. Generate a time series line chart and a growth rate bar chart. Explain what the trends mean for the business.",
+                "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English."
+              ].map((prompt, i) => (
+                <button key={i} onClick={() => setGoal(prompt)} style={styles.promptButton}>
+                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests"][i]}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -492,6 +541,12 @@ export default function App() {
               {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
             </button>
 
+            {result.model_export && Object.keys(result.model_export).length > 0 && (
+              <button onClick={handleExportModel} style={styles.exportModelButton}>
+                📤 Export Model to PWA
+              </button>
+            )}
+
             <div ref={resultsRef} style={styles.results}>
               <h2 style={styles.resultsTitle}>📊 Analysis Report</h2>
               <p style={styles.meta}>{result.rows} rows · {result.columns} columns · {result.turns} agent turns</p>
@@ -500,7 +555,7 @@ export default function App() {
 
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
-                <div style={styles.markdownBody}>
+                <div style={styles.markdownBody} className="markdownBody">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
                 </div>
               </div>
@@ -523,7 +578,7 @@ export default function App() {
                     <h3 style={styles.recommendationsTitle}>💡 Business Recommendations</h3>
                     <button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>
                   </div>
-                  <div style={styles.markdownBody}>
+                  <div style={styles.markdownBody} className="markdownBody">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainRecommendations}</ReactMarkdown>
                   </div>
                 </div>
@@ -535,7 +590,7 @@ export default function App() {
                     <h3 style={styles.executiveTitle}>👔 Executive Summary</h3>
                     <button onClick={handleExecCopy} style={styles.execCopyButton}>{execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}</button>
                   </div>
-                  <div style={styles.markdownBody}>
+                  <div style={styles.markdownBody} className="markdownBody">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{executiveSummary}</ReactMarkdown>
                   </div>
                 </div>
@@ -551,7 +606,7 @@ export default function App() {
                   {chatHistory.map((msg, i) => (
                     <div key={i} style={msg.role === "user" ? styles.userBubble : styles.agentBubble}>
                       <div style={styles.bubbleLabel}>{msg.role === "user" ? "You" : "🤖 Agent"}</div>
-                      <div style={styles.markdownBody}>
+                      <div style={styles.markdownBody} className="markdownBody">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     </div>
@@ -602,6 +657,7 @@ const styles = {
   buttonDisabled: { width: "100%", padding: "14px", backgroundColor: "#334155", color: "#94a3b8", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "not-allowed", marginTop: "8px" },
   exportButton: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#6366f1", border: "2px solid #6366f1", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginTop: "16px" },
   exportButtonDisabled: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "not-allowed", marginTop: "16px" },
+  exportModelButton: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#4ade80", border: "2px solid #4ade80", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
   error: { color: "#f87171", marginTop: "16px", fontSize: "14px" },
   results: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
   resultsTitle: { color: "#f8fafc", fontSize: "20px", marginBottom: "8px" },
