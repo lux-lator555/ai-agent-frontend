@@ -749,6 +749,15 @@ export default function App() {
                     </div>
                   )}
 
+                  {result.roi_charts && result.roi_charts.length > 0 && (
+                   <div style={styles.roiChartsSection}>
+                    <h3 style={styles.roiChartsTitle}>📊 Projected Impact</h3>
+                    {result.roi_charts.map((chart, i) => (
+                     <img key={i} src={`data:image/png;base64,${chart}`} alt={`ROI Chart ${i + 1}`} style={styles.chart} />
+                    ))}
+                   </div>
+                  )}
+                  
                   {mainRecommendations && (
                     <Collapsible title="Recommended Initiatives & ROI" icon="💡" defaultOpen={true}
                       badge={<button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>}>
@@ -853,6 +862,8 @@ const styles = {
   executiveTitle: { color: "#4ade80", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
   execCopyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#4ade80", border: "1px solid #4ade80", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
   copyButton: { padding: "4px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
+  roiChartsSection: { marginBottom: "16px" },
+  roiChartsTitle: { color: "#cbd5e1", fontSize: "15px", fontWeight: "600", marginBottom: "12px" },
 
   // Chat panel
   chatPanel: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", flexDirection: "column", height: "640px", position: "sticky", top: "20px" },
