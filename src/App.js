@@ -59,6 +59,8 @@ const loaderStyles = {
   message: { color: "#6366f1", fontSize: "13px", fontStyle: "italic", marginTop: "12px", minHeight: "20px" },
 };
 
+// ---------- Helpers ----------
+
 function extractSection(text, startMarker, endMarker) {
   if (!text) return "";
   let start = 0;
@@ -86,7 +88,7 @@ function extractMetrics(summary) {
     { pattern: /xgboost/i, name: "XGBoost" },
     { pattern: /lightgbm/i, name: "LightGBM" },
   ];
-const metricPatterns = [
+  const metricPatterns = [
     { pattern: /\baccuracy[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Accuracy" },
     { pattern: /\bprecision[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Precision" },
     { pattern: /\brecall[^0-9]*?([0-9]+\.?[0-9]*)%?/i, key: "Recall" },
@@ -125,8 +127,111 @@ const metricPatterns = [
   return models;
 }
 
+function extractBestModelInfo(summary, metrics) {
+  const modelNames = Object.keys(metrics || {});
+  if (modelNames.length === 0) return null;
+
+  // Try to find a primary metric to compare on
+  const metricPriority = ["ROC-AUC", "F1 Score", "R² Score", "Accuracy"];
+  let bestMetric = null;
+  for (const m of metricPriority) {
+    if (modelNames.some((mod) => metrics[mod][m])) { bestMetric = m; break; }
+  }
+  if (!bestMetric) return { name: modelNames[0], metric: null, value: null };
+
+  let best = { name: modelNames[0], value: -Infinity };
+  for (const mod of modelNames) {
+    const val = parseFloat(metrics[mod][bestMetric] || -Infinity);
+    if (val > best.value) best = { name: mod, value: val };
+  }
+  return { name: best.name, metric: bestMetric, value: best.value };
+}
+
+// Splits the technical analysis text into chunks at "chart anchor points"
+// so charts can be interleaved contextually rather than dumped at the end.
+function distributeChartsInText(text, charts) {
+  if (!charts || charts.length === 0) {
+    return [{ type: "text", content: text }];
+  }
+
+  // Heuristic anchors — look for section headers/keywords that typically precede a chart
+  const anchorPatterns = [
+    /confusion matrix/i,
+    /feature importance/i,
+    /shap/i,
+    /learning curve/i,
+    /roc curve/i,
+    /residual/i,
+    /elbow/i,
+    /cluster/i,
+    /anomaly/i,
+    /scatter/i,
+    /correlation/i,
+    /distribution/i,
+    /trend/i,
+    /seasonality/i,
+    /forecast/i,
+    /cohort/i,
+    /retention heatmap/i,
+    /principal component/i,
+    /pca/i,
+    /rfm/i,
+    /box plot/i,
+  ];
+
+  // Find candidate split points (end of paragraph containing an anchor keyword)
+  const paragraphs = text.split(/\n\n+/);
+  const blocks = [];
+  let chartIdx = 0;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    blocks.push({ type: "text", content: paragraphs[i] });
+    const matchesAnchor = anchorPatterns.some((p) => p.test(paragraphs[i]));
+    if (matchesAnchor && chartIdx < charts.length) {
+      blocks.push({ type: "chart", content: charts[chartIdx] });
+      chartIdx++;
+    }
+  }
+
+  // Any remaining charts go at the end
+  while (chartIdx < charts.length) {
+    blocks.push({ type: "chart", content: charts[chartIdx] });
+    chartIdx++;
+  }
+
+  return blocks;
+}
+
+// ---------- Collapsible section ----------
+
+function Collapsible({ title, icon, defaultOpen = false, children, badge }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={collapseStyles.container}>
+      <div style={collapseStyles.header} onClick={() => setOpen(!open)}>
+        <span style={collapseStyles.title}>
+          <span style={{ marginRight: "8px" }}>{icon}</span>
+          {title}
+          {badge && <span style={{ marginLeft: "10px" }}>{badge}</span>}
+        </span>
+        <span style={{ ...collapseStyles.chev, transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+      </div>
+      {open && <div style={collapseStyles.body}>{children}</div>}
+    </div>
+  );
+}
+
+const collapseStyles = {
+  container: { border: "1px solid #334155", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", backgroundColor: "#0f172a" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", cursor: "pointer" },
+  title: { fontSize: "14px", fontWeight: "600", color: "#cbd5e1", display: "flex", alignItems: "center" },
+  chev: { fontSize: "16px", color: "#64748b", transition: "transform 0.15s" },
+  body: { padding: "0 18px 18px", fontSize: "14px", color: "#94a3b8", lineHeight: "1.8" },
+};
+
+// ---------- Model Comparison Table ----------
+
 function ModelComparisonTable({ summary }) {
-  // Check if the summary already contains a markdown table with model metrics
   const hasMarkdownTable = /\|.*Accuracy.*\|/i.test(summary) || /\|.*Model.*\|.*Accuracy/i.test(summary);
   if (hasMarkdownTable) return null;
 
@@ -172,20 +277,21 @@ function ModelComparisonTable({ summary }) {
 }
 
 const tableStyles = {
-  container: { marginTop: "24px", marginBottom: "24px" },
-  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px" },
+  container: { marginTop: "16px", marginBottom: "16px" },
+  title: { color: "#cbd5e1", fontSize: "15px", fontWeight: "600", marginBottom: "12px" },
   wrapper: { overflowX: "auto" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: "13px" },
-  th: { backgroundColor: "#0f172a", color: "#cbd5e1", padding: "10px 14px", textAlign: "left", borderBottom: "1px solid #334155", fontWeight: "600" },
+  th: { backgroundColor: "#1e293b", color: "#cbd5e1", padding: "10px 14px", textAlign: "left", borderBottom: "1px solid #334155", fontWeight: "600" },
   td: { padding: "10px 14px", borderBottom: "1px solid #1e293b", color: "#94a3b8" },
 };
+
+// ---------- Data Quality Report ----------
 
 function DataQualityReport({ report }) {
   if (!report) return null;
   const hasIssues = Object.keys(report.missing_values).length > 0 || Object.keys(report.outliers).length > 0 || report.duplicates > 0;
   return (
-    <div style={qualityStyles.container}>
-      <h3 style={qualityStyles.title}>🔍 Data Quality Report</h3>
+    <div>
       <div style={qualityStyles.grid}>
         <div style={qualityStyles.stat}><span style={qualityStyles.statValue}>{report.total_rows}</span><span style={qualityStyles.statLabel}>Total Rows</span></div>
         <div style={qualityStyles.stat}><span style={qualityStyles.statValue}>{report.total_columns}</span><span style={qualityStyles.statLabel}>Columns</span></div>
@@ -223,11 +329,9 @@ function DataQualityReport({ report }) {
 }
 
 const qualityStyles = {
-  container: { marginBottom: "24px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "20px", border: "1px solid #334155" },
-  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "16px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" },
   stat: { textAlign: "center", padding: "12px", backgroundColor: "#1e293b", borderRadius: "8px" },
-  statValue: { display: "block", fontSize: "24px", fontWeight: "700", color: "#f8fafc" },
+  statValue: { display: "block", fontSize: "22px", fontWeight: "700", color: "#f8fafc" },
   statLabel: { display: "block", fontSize: "11px", color: "#64748b", marginTop: "4px" },
   section: { marginTop: "12px" },
   sectionTitle: { color: "#94a3b8", fontSize: "13px", fontWeight: "600", marginBottom: "8px" },
@@ -237,23 +341,14 @@ const qualityStyles = {
   recommendation: { color: "#4ade80", fontSize: "13px", marginBottom: "4px" },
 };
 
+// ---------- Confidence Scores ----------
+
 function ConfidenceScores({ scores }) {
   if (!scores || !scores.scores || scores.scores.length === 0) return null;
   const colorMap = { high: "#4ade80", medium: "#fbbf24", low: "#f87171" };
   const emojiMap = { high: "🟢", medium: "🟡", low: "🔴" };
   return (
-    <div style={confidenceStyles.container}>
-      <div style={confidenceStyles.header}>
-        <h3 style={confidenceStyles.title}>🎯 Confidence Assessment</h3>
-        <span style={{
-          ...confidenceStyles.badge,
-          backgroundColor: colorMap[scores.overall_confidence] + "20",
-          color: colorMap[scores.overall_confidence],
-          border: `1px solid ${colorMap[scores.overall_confidence]}`,
-        }}>
-          {emojiMap[scores.overall_confidence]} Overall: {scores.overall_confidence.toUpperCase()}
-        </span>
-      </div>
+    <div>
       {scores.scores.map((item, i) => (
         <div key={i} style={confidenceStyles.item}>
           <div style={confidenceStyles.itemHeader}>
@@ -269,10 +364,6 @@ function ConfidenceScores({ scores }) {
 }
 
 const confidenceStyles = {
-  container: { marginTop: "24px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "20px", border: "1px solid #334155" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
-  title: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600" },
-  badge: { padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" },
   item: { padding: "10px 0", borderBottom: "1px solid #1e293b" },
   itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" },
   finding: { color: "#cbd5e1", fontSize: "13px" },
@@ -280,6 +371,25 @@ const confidenceStyles = {
   reason: { color: "#64748b", fontSize: "12px", margin: "0" },
   caveats: { color: "#fbbf24", fontSize: "12px", marginTop: "12px" },
 };
+
+// ---------- Confidence Badge (for summary bar) ----------
+
+function ConfidenceBadge({ scores }) {
+  if (!scores || !scores.overall_confidence) return <span style={{ color: "#64748b" }}>—</span>;
+  const colorMap = { high: "#4ade80", medium: "#fbbf24", low: "#f87171" };
+  const emojiMap = { high: "🟢", medium: "🟡", low: "🔴" };
+  const conf = scores.overall_confidence;
+  return (
+    <span style={{
+      display: "inline-block", padding: "4px 12px", borderRadius: "20px", fontSize: "13px", fontWeight: "600",
+      backgroundColor: colorMap[conf] + "20", color: colorMap[conf], border: `1px solid ${colorMap[conf]}`,
+    }}>
+      {emojiMap[conf]} {conf.charAt(0).toUpperCase() + conf.slice(1)}
+    </span>
+  );
+}
+
+// ---------- Main App ----------
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -297,6 +407,8 @@ export default function App() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [execCopySuccess, setExecCopySuccess] = useState(false);
   const [detection, setDetection] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [chatOpen, setChatOpen] = useState(true);
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
 
@@ -331,6 +443,7 @@ export default function App() {
     setError(null);
     setResult(null);
     setChatHistory([]);
+    setActiveTab("overview");
     const formData = new FormData();
     formData.append("file", file);
     formData.append("goal", goal);
@@ -471,9 +584,14 @@ export default function App() {
     ? extractSection(result.recommendations, "Executive Summary", null)
     : "";
 
+  const cleanedSummaryText = result ? cleanSummary(result.summary) : "";
+  const metrics = result ? extractMetrics(cleanedSummaryText) : {};
+  const bestModel = result ? extractBestModelInfo(cleanedSummaryText, metrics) : null;
+  const contentBlocks = result ? distributeChartsInText(cleanedSummaryText, result.charts || []) : [];
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div style={styles.page}>
+      <div style={styles.outerCard}>
         <h1 style={styles.title}>🤖 AI Data Analyst Agent</h1>
         <p style={styles.subtitle}>Enter your Gemini API key first, then upload a CSV and the agent will automatically detect what to analyze.</p>
 
@@ -482,7 +600,7 @@ export default function App() {
             <p style={styles.historyLabel}>Recent analyses:</p>
             <div style={styles.historyList}>
               {history.map((item) => (
-                <button key={item.id} onClick={() => { setResult(item.data); setChatHistory([]); }} style={styles.historyItem}>
+                <button key={item.id} onClick={() => { setResult(item.data); setChatHistory([]); setActiveTab("overview"); }} style={styles.historyItem}>
                   <span style={styles.historyFile}>📁 {item.filename}</span>
                   <span style={styles.historyTime}>{item.timestamp}</span>
                 </button>
@@ -522,10 +640,12 @@ export default function App() {
                 "Predict which shipments are likely to be delayed. Run BOTH logistic regression AND random forest models separately. For each model print accuracy, precision, recall, F1 score and ROC-AUC. Generate confusion matrix and feature importance charts. Use SHAP to explain delay predictions.",
                 "Detect anomalies and outliers in this dataset. Use Isolation Forest and DBSCAN to identify unusual records. Show how many anomalies were found, visualize them in a scatter plot with anomalies highlighted in red, and explain in plain English what makes each anomaly unusual and what business action should be taken.",
                 "Analyze trends in this dataset. Identify date columns and parse them. Calculate month-over-month growth rates, identify seasonality patterns, determine overall trend direction, and forecast the next 3 periods. Generate a time series line chart and a growth rate bar chart. Explain what the trends mean for the business.",
-                "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English."
+                "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English.",
+                "Run RFM analysis on this customer transaction dataset. Calculate Recency, Frequency, and Monetary scores for each customer. Segment customers into groups like Champions, Loyal Customers, At Risk, Lost, and New Customers. Generate a bar chart of customer counts per segment and a scatter plot of Recency vs Frequency colored by segment. Recommend marketing actions for each segment.",
+                "Run cohort retention analysis on this dataset. Group customers into cohorts based on their signup date month. For each cohort, calculate the retention rate for each subsequent month. Generate a cohort retention heatmap. Determine whether newer cohorts retain better or worse than older cohorts and explain what this means for the business."
               ].map((prompt, i) => (
                 <button key={i} onClick={() => setGoal(prompt)} style={styles.promptButton}>
-                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests"][i]}
+                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests", "🏆 RFM Analysis", "📅 Cohort Analysis"][i]}
                 </button>
               ))}
             </div>
@@ -538,75 +658,120 @@ export default function App() {
 
         {loading && <RobotLoader />}
         {error && <p style={styles.error}>{error}</p>}
+      </div>
 
-        {result && (
-          <div>
-            <button onClick={handleExportPDF} disabled={exporting} style={exporting ? styles.exportButtonDisabled : styles.exportButton}>
-              {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
-            </button>
+      {result && (
+        <div style={styles.dashboardWrap}>
+          {/* Summary bar */}
+          <div style={styles.summaryBar}>
+            <div style={styles.summaryCard}>
+              <div style={styles.summaryVal}>{result.rows?.toLocaleString()}</div>
+              <div style={styles.summaryLbl}>Rows analyzed</div>
+            </div>
+            <div style={styles.summaryCard}>
+              <div style={{ ...styles.summaryVal, fontSize: "16px" }}>{bestModel?.name || "—"}</div>
+              <div style={styles.summaryLbl}>Best model</div>
+            </div>
+            <div style={styles.summaryCard}>
+              <div style={{ ...styles.summaryVal, color: "#4ade80" }}>
+                {bestModel?.value != null ? (bestModel.value <= 1 ? (bestModel.value * 100).toFixed(1) + "%" : bestModel.value.toFixed(2)) : "—"}
+              </div>
+              <div style={styles.summaryLbl}>{bestModel?.metric || "Metric"}</div>
+            </div>
+            <div style={styles.summaryCard}>
+              <ConfidenceBadge scores={result.confidence_scores} />
+              <div style={styles.summaryLbl}>Confidence</div>
+            </div>
+          </div>
 
-            {result.model_export && Object.keys(result.model_export).length > 0 && (
-              <button onClick={handleExportModel} style={styles.exportModelButton}>
-                📤 Export Model to PWA
-              </button>
-            )}
-
-            <div ref={resultsRef} style={styles.results}>
-              <h2 style={styles.resultsTitle}>📊 Analysis Report</h2>
-              <p style={styles.meta}>{result.rows} rows · {result.columns} columns · {result.turns} agent turns</p>
-
-              <DataQualityReport report={result.quality_report} />
-
-              <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>📈 Technical Analysis</h3>
-                <div style={styles.markdownBody} className="markdownBody">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanSummary(result.summary)}</ReactMarkdown>
-                </div>
+          <div style={{ ...styles.layout, gridTemplateColumns: chatOpen ? "1fr 320px" : "1fr" }}>
+            {/* Main column */}
+            <div style={styles.mainCol} ref={resultsRef}>
+              <div style={styles.actionRow}>
+                <button onClick={handleExportPDF} disabled={exporting} style={exporting ? styles.exportButtonDisabled : styles.exportButton}>
+                  {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
+                </button>
+                {result.model_export && Object.keys(result.model_export).length > 0 && (
+                  <button onClick={handleExportModel} style={styles.exportModelButton}>
+                    📤 Export Model to PWA
+                  </button>
+                )}
+                {!chatOpen && (
+                  <button onClick={() => setChatOpen(true)} style={styles.toggleChatButton}>
+                    💬 Open Chat
+                  </button>
+                )}
               </div>
 
-              <ModelComparisonTable summary={cleanSummary(result.summary)} />
-              <ConfidenceScores scores={result.confidence_scores} />
+              <div style={styles.tabs}>
+                <button onClick={() => setActiveTab("overview")} style={activeTab === "overview" ? styles.tabActive : styles.tab}>📊 Overview</button>
+                <button onClick={() => setActiveTab("recommendations")} style={activeTab === "recommendations" ? styles.tabActive : styles.tab}>💡 Recommendations</button>
+              </div>
 
-              {result.charts && result.charts.length > 0 && (
-                <div style={styles.section}>
-                  <h3 style={styles.sectionTitle}>📉 Charts</h3>
-                  {result.charts.map((chart, i) => (
-                    <img key={i} src={`data:image/png;base64,${chart}`} alt={`Chart ${i + 1}`} style={styles.chart} />
-                  ))}
+              {activeTab === "overview" && (
+                <div>
+                  <Collapsible title="Data Quality Report" icon="🔍" defaultOpen={true}>
+                    <DataQualityReport report={result.quality_report} />
+                  </Collapsible>
+
+                  <Collapsible title="Technical Analysis" icon="📈" defaultOpen={true}>
+                    {contentBlocks.map((block, i) =>
+                      block.type === "text" ? (
+                        block.content.trim() && (
+                          <div key={i} style={styles.markdownBody} className="markdownBody">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>
+                          </div>
+                        )
+                      ) : (
+                        <img key={i} src={`data:image/png;base64,${block.content}`} alt={`Chart ${i + 1}`} style={styles.chart} />
+                      )
+                    )}
+                    <ModelComparisonTable summary={cleanedSummaryText} />
+                  </Collapsible>
+
+                  <Collapsible title="Confidence Assessment" icon="🎯">
+                    <ConfidenceScores scores={result.confidence_scores} />
+                  </Collapsible>
                 </div>
               )}
 
-              {mainRecommendations && (
-                <div style={styles.recommendationsCard}>
-                  <div style={styles.recommendationsHeader}>
-                    <h3 style={styles.recommendationsTitle}>💡 Business Recommendations</h3>
-                    <button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>
-                  </div>
-                  <div style={styles.markdownBody} className="markdownBody">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainRecommendations}</ReactMarkdown>
-                  </div>
-                </div>
-              )}
+              {activeTab === "recommendations" && (
+                <div>
+                  {executiveSummary && (
+                    <div style={styles.executiveCard}>
+                      <div style={styles.executiveHeader}>
+                        <h3 style={styles.executiveTitle}>👔 Executive Summary</h3>
+                        <button onClick={handleExecCopy} style={styles.execCopyButton}>{execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}</button>
+                      </div>
+                      <div style={styles.markdownBody} className="markdownBody">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{executiveSummary}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
 
-              {executiveSummary && (
-                <div style={styles.executiveCard}>
-                  <div style={styles.executiveHeader}>
-                    <h3 style={styles.executiveTitle}>👔 Executive Summary</h3>
-                    <button onClick={handleExecCopy} style={styles.execCopyButton}>{execCopySuccess ? "✅ Copied!" : "📋 Copy for Presentation"}</button>
-                  </div>
-                  <div style={styles.markdownBody} className="markdownBody">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{executiveSummary}</ReactMarkdown>
-                  </div>
+                  {mainRecommendations && (
+                    <Collapsible title="Recommended Initiatives & ROI" icon="💡" defaultOpen={true}
+                      badge={<button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>}>
+                      <div style={styles.markdownBody} className="markdownBody">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainRecommendations}</ReactMarkdown>
+                      </div>
+                    </Collapsible>
+                  )}
                 </div>
               )}
             </div>
 
-            <div style={styles.chatContainer}>
-              <h3 style={styles.chatTitle}>💬 Ask a Follow-Up Question</h3>
-              <p style={styles.chatSubtitle}>Ask anything about the analysis, request clarification, or explore what-if scenarios.</p>
-
-              {chatHistory.length > 0 && (
-                <div style={styles.chatHistory}>
+            {/* Chat panel */}
+            {chatOpen && (
+              <div style={styles.chatPanel}>
+                <div style={styles.chatHeader}>
+                  <span>💬 Ask about this analysis</span>
+                  <button onClick={() => setChatOpen(false)} style={styles.chatCloseButton} title="Collapse chat">✕</button>
+                </div>
+                <div style={styles.chatMessages}>
+                  {chatHistory.length === 0 && (
+                    <p style={styles.chatEmpty}>Ask anything about the analysis, request clarification, or explore what-if scenarios.</p>
+                  )}
                   {chatHistory.map((msg, i) => (
                     <div key={i} style={msg.role === "user" ? styles.userBubble : styles.agentBubble}>
                       <div style={styles.bubbleLabel}>{msg.role === "user" ? "You" : "🤖 Agent"}</div>
@@ -623,23 +788,22 @@ export default function App() {
                   )}
                   <div ref={chatBottomRef} />
                 </div>
-              )}
-
-              <div style={styles.chatInputRow}>
-                <input type="text" placeholder="e.g. Which customers should we contact first?" value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleFollowUp()} style={styles.chatInput} disabled={chatLoading} />
-                <button onClick={handleFollowUp} disabled={chatLoading || !chatInput.trim()} style={chatLoading || !chatInput.trim() ? styles.sendButtonDisabled : styles.sendButton}>Send</button>
+                <div style={styles.chatInputRow}>
+                  <input type="text" placeholder="Ask a question..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleFollowUp()} style={styles.chatInput} disabled={chatLoading} />
+                  <button onClick={handleFollowUp} disabled={chatLoading || !chatInput.trim()} style={chatLoading || !chatInput.trim() ? styles.sendButtonDisabled : styles.sendButton}>Send</button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
 const styles = {
-  container: { minHeight: "100vh", backgroundColor: "#0f172a", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 20px", fontFamily: "'Segoe UI', sans-serif" },
-  card: { backgroundColor: "#1e293b", borderRadius: "16px", padding: "40px", width: "100%", maxWidth: "720px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" },
+  page: { minHeight: "100vh", backgroundColor: "#0f172a", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", fontFamily: "'Segoe UI', sans-serif" },
+  outerCard: { backgroundColor: "#1e293b", borderRadius: "16px", padding: "40px", width: "100%", maxWidth: "900px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", marginBottom: "24px" },
   title: { color: "#f8fafc", fontSize: "28px", marginBottom: "8px" },
   subtitle: { color: "#94a3b8", marginBottom: "32px", fontSize: "15px" },
   historyContainer: { marginBottom: "24px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #334155" },
@@ -659,37 +823,52 @@ const styles = {
   textarea: { width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "14px", minHeight: "80px", boxSizing: "border-box", resize: "vertical" },
   button: { width: "100%", padding: "14px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
   buttonDisabled: { width: "100%", padding: "14px", backgroundColor: "#334155", color: "#94a3b8", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "not-allowed", marginTop: "8px" },
-  exportButton: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#6366f1", border: "2px solid #6366f1", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginTop: "16px" },
-  exportButtonDisabled: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "not-allowed", marginTop: "16px" },
-  exportModelButton: { width: "100%", padding: "12px", backgroundColor: "#0f172a", color: "#4ade80", border: "2px solid #4ade80", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
   error: { color: "#f87171", marginTop: "16px", fontSize: "14px" },
-  results: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
-  resultsTitle: { color: "#f8fafc", fontSize: "20px", marginBottom: "8px" },
-  meta: { color: "#64748b", fontSize: "13px", marginBottom: "20px" },
-  section: { marginBottom: "32px" },
-  sectionTitle: { color: "#cbd5e1", fontSize: "16px", fontWeight: "600", marginBottom: "12px", marginTop: "24px" },
+
+  // Dashboard
+  dashboardWrap: { width: "100%", maxWidth: "1200px" },
+  summaryBar: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" },
+  summaryCard: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "16px", textAlign: "center" },
+  summaryVal: { fontSize: "24px", fontWeight: "700", color: "#f8fafc" },
+  summaryLbl: { fontSize: "12px", color: "#64748b", marginTop: "4px" },
+
+  layout: { display: "grid", gap: "16px", alignItems: "start" },
+  mainCol: { minWidth: 0 },
+
+  actionRow: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" },
+  exportButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#6366f1", border: "2px solid #6366f1", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
+  exportButtonDisabled: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "not-allowed" },
+  exportModelButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#4ade80", border: "2px solid #4ade80", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
+  toggleChatButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#94a3b8", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer", marginLeft: "auto" },
+
+  tabs: { display: "flex", gap: "4px", marginBottom: "16px", borderBottom: "1px solid #334155" },
+  tab: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#64748b", borderBottom: "2px solid transparent", marginBottom: "-1px", fontWeight: "500" },
+  tabActive: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#f8fafc", borderBottom: "2px solid #6366f1", marginBottom: "-1px", fontWeight: "600" },
+
   markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
-  chart: { width: "100%", borderRadius: "8px", marginBottom: "16px", border: "1px solid #334155" },
-  recommendationsCard: { marginTop: "32px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "1px solid #6366f1" },
-  recommendationsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
-  recommendationsTitle: { color: "#6366f1", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
-  copyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
-  executiveCard: { marginTop: "16px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "2px solid #4ade80" },
+  chart: { width: "100%", borderRadius: "8px", marginTop: "8px", marginBottom: "16px", border: "1px solid #334155" },
+
+  executiveCard: { marginBottom: "16px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "2px solid #4ade80" },
   executiveHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
   executiveTitle: { color: "#4ade80", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
   execCopyButton: { padding: "6px 12px", backgroundColor: "#1e293b", color: "#4ade80", border: "1px solid #4ade80", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: "500" },
-  chatContainer: { marginTop: "32px", borderTop: "1px solid #334155", paddingTop: "24px" },
-  chatTitle: { color: "#f8fafc", fontSize: "18px", marginBottom: "8px" },
-  chatSubtitle: { color: "#64748b", fontSize: "13px", marginBottom: "16px" },
-  chatHistory: { marginBottom: "16px", display: "flex", flexDirection: "column", gap: "12px" },
-  userBubble: { backgroundColor: "#334155", borderRadius: "12px", padding: "12px 16px", alignSelf: "flex-end", maxWidth: "85%", marginLeft: "auto" },
-  agentBubble: { backgroundColor: "#0f172a", borderRadius: "12px", padding: "12px 16px", border: "1px solid #334155", maxWidth: "95%" },
-  bubbleLabel: { fontSize: "11px", color: "#64748b", marginBottom: "6px", fontWeight: "600", textTransform: "uppercase" },
-  thinking: { color: "#64748b", fontSize: "14px", fontStyle: "italic" },
-  chatInputRow: { display: "flex", gap: "8px" },
-  chatInput: { flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "14px" },
-  sendButton: { padding: "10px 20px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer" },
-  sendButtonDisabled: { padding: "10px 20px", backgroundColor: "#334155", color: "#64748b", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "not-allowed" },
+  copyButton: { padding: "4px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
+
+  // Chat panel
+  chatPanel: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", flexDirection: "column", height: "640px", position: "sticky", top: "20px" },
+  chatHeader: { padding: "14px 16px", borderBottom: "1px solid #334155", fontSize: "14px", fontWeight: "600", color: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  chatCloseButton: { background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "16px", padding: "0 4px" },
+  chatMessages: { flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" },
+  chatEmpty: { color: "#64748b", fontSize: "13px", fontStyle: "italic" },
+  userBubble: { backgroundColor: "#334155", borderRadius: "12px", padding: "10px 14px", alignSelf: "flex-end", maxWidth: "92%", marginLeft: "auto" },
+  agentBubble: { backgroundColor: "#0f172a", borderRadius: "12px", padding: "10px 14px", border: "1px solid #334155", maxWidth: "95%" },
+  bubbleLabel: { fontSize: "11px", color: "#64748b", marginBottom: "4px", fontWeight: "600", textTransform: "uppercase" },
+  thinking: { color: "#64748b", fontSize: "13px", fontStyle: "italic", margin: 0 },
+  chatInputRow: { display: "flex", gap: "8px", padding: "12px", borderTop: "1px solid #334155" },
+  chatInput: { flex: 1, padding: "10px 12px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "13px" },
+  sendButton: { padding: "10px 16px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
+  sendButtonDisabled: { padding: "10px 16px", backgroundColor: "#334155", color: "#64748b", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "not-allowed" },
+
   suggestedPrompts: { marginTop: "10px" },
   suggestedLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
   promptButtons: { display: "flex", flexWrap: "wrap", gap: "8px" },
