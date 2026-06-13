@@ -74,7 +74,9 @@ function extractSection(text, startMarker, endMarker) {
     const endIdx = text.indexOf(endMarker);
     if (endIdx !== -1) end = endIdx;
   }
-  return text.substring(start, end).trim();
+  let result = text.substring(start, end).trim();
+  result = result.replace(/\n#{0,6}\s*\d+\.\s*$/, "").trim();
+  return result;
 }
 
 function extractMetrics(summary) {
