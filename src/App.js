@@ -59,8 +59,6 @@ const loaderStyles = {
   message: { color: "#6366f1", fontSize: "13px", fontStyle: "italic", marginTop: "12px", minHeight: "20px" },
 };
 
-// ---------- Helpers ----------
-
 function extractSection(text, startMarker, endMarker) {
   if (!text) return "";
   let start = 0;
@@ -132,15 +130,12 @@ function extractMetrics(summary) {
 function extractBestModelInfo(summary, metrics) {
   const modelNames = Object.keys(metrics || {});
   if (modelNames.length === 0) return null;
-
-  // Try to find a primary metric to compare on
   const metricPriority = ["ROC-AUC", "F1 Score", "R² Score", "Accuracy"];
   let bestMetric = null;
   for (const m of metricPriority) {
     if (modelNames.some((mod) => metrics[mod][m])) { bestMetric = m; break; }
   }
   if (!bestMetric) return { name: modelNames[0], metric: null, value: null };
-
   let best = { name: modelNames[0], value: -Infinity };
   for (const mod of modelNames) {
     const val = parseFloat(metrics[mod][bestMetric] || -Infinity);
@@ -149,43 +144,20 @@ function extractBestModelInfo(summary, metrics) {
   return { name: best.name, metric: bestMetric, value: best.value };
 }
 
-// Splits the technical analysis text into chunks at "chart anchor points"
-// so charts can be interleaved contextually rather than dumped at the end.
 function distributeChartsInText(text, charts) {
   if (!charts || charts.length === 0) {
     return [{ type: "text", content: text }];
   }
-
-  // Heuristic anchors — look for section headers/keywords that typically precede a chart
   const anchorPatterns = [
-    /confusion matrix/i,
-    /feature importance/i,
-    /shap/i,
-    /learning curve/i,
-    /roc curve/i,
-    /residual/i,
-    /elbow/i,
-    /cluster/i,
-    /anomaly/i,
-    /scatter/i,
-    /correlation/i,
-    /distribution/i,
-    /trend/i,
-    /seasonality/i,
-    /forecast/i,
-    /cohort/i,
-    /retention heatmap/i,
-    /principal component/i,
-    /pca/i,
-    /rfm/i,
-    /box plot/i,
+    /confusion matrix/i, /feature importance/i, /shap/i, /learning curve/i,
+    /roc curve/i, /residual/i, /elbow/i, /cluster/i, /anomaly/i, /scatter/i,
+    /correlation/i, /distribution/i, /trend/i, /seasonality/i, /forecast/i,
+    /cohort/i, /retention heatmap/i, /principal component/i, /pca/i,
+    /rfm/i, /box plot/i, /pareto/i, /control chart/i,
   ];
-
-  // Find candidate split points (end of paragraph containing an anchor keyword)
   const paragraphs = text.split(/\n\n+/);
   const blocks = [];
   let chartIdx = 0;
-
   for (let i = 0; i < paragraphs.length; i++) {
     blocks.push({ type: "text", content: paragraphs[i] });
     const matchesAnchor = anchorPatterns.some((p) => p.test(paragraphs[i]));
@@ -194,17 +166,12 @@ function distributeChartsInText(text, charts) {
       chartIdx++;
     }
   }
-
-  // Any remaining charts go at the end
   while (chartIdx < charts.length) {
     blocks.push({ type: "chart", content: charts[chartIdx] });
     chartIdx++;
   }
-
   return blocks;
 }
-
-// ---------- Collapsible section ----------
 
 function Collapsible({ title, icon, defaultOpen = false, children, badge }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -231,12 +198,9 @@ const collapseStyles = {
   body: { padding: "0 18px 18px", fontSize: "14px", color: "#94a3b8", lineHeight: "1.8" },
 };
 
-// ---------- Model Comparison Table ----------
-
 function ModelComparisonTable({ summary }) {
   const hasMarkdownTable = /\|.*Accuracy.*\|/i.test(summary) || /\|.*Model.*\|.*Accuracy/i.test(summary);
   if (hasMarkdownTable) return null;
-
   const metrics = extractMetrics(summary);
   const modelNames = Object.keys(metrics);
   if (modelNames.length < 2) return null;
@@ -260,11 +224,7 @@ function ModelComparisonTable({ summary }) {
                 <tr key={metric}>
                   <td style={tableStyles.td}>{metric}</td>
                   {modelNames.map((m, i) => (
-                    <td key={m} style={{
-                      ...tableStyles.td,
-                      color: values[i] === best ? "#6366f1" : "#94a3b8",
-                      fontWeight: values[i] === best ? "700" : "400",
-                    }}>
+                    <td key={m} style={{ ...tableStyles.td, color: values[i] === best ? "#6366f1" : "#94a3b8", fontWeight: values[i] === best ? "700" : "400" }}>
                       {metrics[m][metric] || "—"}{values[i] === best && " ✓"}
                     </td>
                   ))}
@@ -287,8 +247,6 @@ const tableStyles = {
   td: { padding: "10px 14px", borderBottom: "1px solid #1e293b", color: "#94a3b8" },
 };
 
-// ---------- Data Quality Report ----------
-
 function DataQualityReport({ report }) {
   if (!report) return null;
   const hasIssues = Object.keys(report.missing_values).length > 0 || Object.keys(report.outliers).length > 0 || report.duplicates > 0;
@@ -304,10 +262,7 @@ function DataQualityReport({ report }) {
         <div style={qualityStyles.section}>
           <p style={qualityStyles.sectionTitle}>⚠️ Missing Values</p>
           {Object.entries(report.missing_values).map(([col, info]) => (
-            <div key={col} style={qualityStyles.item}>
-              <span style={qualityStyles.colName}>{col}</span>
-              <span style={qualityStyles.colValue}>{info.count} missing ({info.percentage}%)</span>
-            </div>
+            <div key={col} style={qualityStyles.item}><span style={qualityStyles.colName}>{col}</span><span style={qualityStyles.colValue}>{info.count} missing ({info.percentage}%)</span></div>
           ))}
         </div>
       )}
@@ -315,10 +270,7 @@ function DataQualityReport({ report }) {
         <div style={qualityStyles.section}>
           <p style={qualityStyles.sectionTitle}>📊 Outliers Detected</p>
           {Object.entries(report.outliers).map(([col, count]) => (
-            <div key={col} style={qualityStyles.item}>
-              <span style={qualityStyles.colName}>{col}</span>
-              <span style={qualityStyles.colValue}>{count} outliers</span>
-            </div>
+            <div key={col} style={qualityStyles.item}><span style={qualityStyles.colName}>{col}</span><span style={qualityStyles.colValue}>{count} outliers</span></div>
           ))}
         </div>
       )}
@@ -342,8 +294,6 @@ const qualityStyles = {
   colValue: { color: "#fbbf24", fontSize: "13px" },
   recommendation: { color: "#4ade80", fontSize: "13px", marginBottom: "4px" },
 };
-
-// ---------- Confidence Scores ----------
 
 function ConfidenceScores({ scores }) {
   if (!scores || !scores.scores || scores.scores.length === 0) return null;
@@ -374,20 +324,142 @@ const confidenceStyles = {
   caveats: { color: "#fbbf24", fontSize: "12px", marginTop: "12px" },
 };
 
-// ---------- Confidence Badge (for summary bar) ----------
-
 function ConfidenceBadge({ scores }) {
   if (!scores || !scores.overall_confidence) return <span style={{ color: "#64748b" }}>—</span>;
   const colorMap = { high: "#4ade80", medium: "#fbbf24", low: "#f87171" };
   const emojiMap = { high: "🟢", medium: "🟡", low: "🔴" };
   const conf = scores.overall_confidence;
   return (
-    <span style={{
-      display: "inline-block", padding: "4px 12px", borderRadius: "20px", fontSize: "13px", fontWeight: "600",
-      backgroundColor: colorMap[conf] + "20", color: colorMap[conf], border: `1px solid ${colorMap[conf]}`,
-    }}>
+    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: "20px", fontSize: "13px", fontWeight: "600", backgroundColor: colorMap[conf] + "20", color: colorMap[conf], border: `1px solid ${colorMap[conf]}` }}>
       {emojiMap[conf]} {conf.charAt(0).toUpperCase() + conf.slice(1)}
     </span>
+  );
+}
+
+// ---------- SQL Query Tab ----------
+
+function SqlBlock({ title, description, sql, defaultOpen = false }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(sql);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Collapsible title={title} icon="📋" defaultOpen={defaultOpen}
+      badge={<button onClick={(e) => { e.stopPropagation(); handleCopy(); }} style={sqlStyles.copyBtn}>{copied ? "✅ Copied!" : "Copy SQL"}</button>}>
+      {description && <p style={sqlStyles.description}>{description}</p>}
+      <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{sql}</code></pre>
+    </Collapsible>
+  );
+}
+
+const sqlStyles = {
+  copyBtn: { padding: "3px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
+  description: { color: "#64748b", fontSize: "13px", marginBottom: "12px", fontStyle: "italic" },
+  pre: { backgroundColor: "#020617", borderRadius: "8px", padding: "16px", overflowX: "auto", margin: "0", border: "1px solid #1e293b" },
+  code: { color: "#e2e8f0", fontSize: "12px", fontFamily: "monospace", lineHeight: "1.6", whiteSpace: "pre" },
+  dbSelector: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", padding: "12px 16px", backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #334155" },
+  dbLabel: { color: "#94a3b8", fontSize: "13px", fontWeight: "600" },
+  dbSelect: { padding: "6px 10px", backgroundColor: "#1e293b", color: "#f8fafc", border: "1px solid #334155", borderRadius: "6px", fontSize: "13px", cursor: "pointer" },
+  infoBox: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px", color: "#64748b" },
+  tableTag: { display: "inline-block", backgroundColor: "#1e293b", color: "#6366f1", padding: "2px 8px", borderRadius: "4px", fontFamily: "monospace", fontSize: "12px", marginLeft: "6px" },
+};
+
+function SqlTab({ sqlQueries }) {
+  const [dbFlavor, setDbFlavor] = useState("standard");
+  const [copiedCreate, setCopiedCreate] = useState(false);
+
+  if (!sqlQueries || !sqlQueries.table_name) {
+    return <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic" }}>No SQL queries generated yet. Run an analysis to generate SQL.</p>;
+  }
+
+  const adaptSql = (sql) => {
+    if (!sql) return "";
+    switch (dbFlavor) {
+      case "sqlserver":
+        return sql.replace(/LIMIT (\d+)/gi, "-- Use TOP $1 in SQL Server: SELECT TOP $1 ...")
+                  .replace(/ISNULL\(/gi, "ISNULL(")
+                  .replace(/DATE_TRUNC/gi, "DATETRUNC");
+      case "mysql":
+        return sql.replace(/DECIMAL\(10,2\)/gi, "DOUBLE")
+                  .replace(/VARCHAR\(255\)/gi, "TEXT");
+      case "bigquery":
+        return sql.replace(/DATETIME/gi, "TIMESTAMP")
+                  .replace(/VARCHAR\(255\)/gi, "STRING")
+                  .replace(/INTEGER/gi, "INT64")
+                  .replace(/DECIMAL\(10,2\)/gi, "FLOAT64");
+      default:
+        return sql;
+    }
+  };
+
+  return (
+    <div>
+      <div style={sqlStyles.dbSelector}>
+        <span style={sqlStyles.dbLabel}>Database:</span>
+        <select style={sqlStyles.dbSelect} value={dbFlavor} onChange={e => setDbFlavor(e.target.value)}>
+          <option value="standard">Standard SQL (ANSI)</option>
+          <option value="sqlserver">SQL Server / Azure</option>
+          <option value="snowflake">Snowflake</option>
+          <option value="bigquery">BigQuery</option>
+          <option value="postgresql">PostgreSQL</option>
+          <option value="mysql">MySQL</option>
+        </select>
+        <span style={sqlStyles.dbLabel}>Table:</span>
+        <span style={sqlStyles.tableTag}>{sqlQueries.table_name}</span>
+      </div>
+
+      <div style={sqlStyles.infoBox}>
+        💡 These queries are generated based on the analysis performed. Copy them directly into your database client, BI tool, or data pipeline. Adjust table names and schema prefixes as needed for your environment.
+      </div>
+
+      {/* Create Table */}
+      <Collapsible title="Table Definition" icon="🏗️" defaultOpen={true}
+        badge={
+          <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(adaptSql(sqlQueries.create_table)); setCopiedCreate(true); setTimeout(() => setCopiedCreate(false), 2000); }} style={sqlStyles.copyBtn}>
+            {copiedCreate ? "✅ Copied!" : "Copy SQL"}
+          </button>
+        }>
+        <p style={sqlStyles.description}>Use this to create the table in your database before importing the CSV data.</p>
+        <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{adaptSql(sqlQueries.create_table)}</code></pre>
+      </Collapsible>
+
+      {/* Main Query */}
+      {sqlQueries.main_query && (
+        <SqlBlock
+          title="Main Analysis Query"
+          description="Pulls the primary dataset used in this analysis with all relevant columns and filters."
+          sql={adaptSql(sqlQueries.main_query)}
+          defaultOpen={true}
+        />
+      )}
+
+      {/* Metric Queries */}
+      {sqlQueries.metric_queries && sqlQueries.metric_queries.length > 0 && (
+        <div>
+          <h3 style={{ color: "#cbd5e1", fontSize: "15px", fontWeight: "600", margin: "20px 0 12px" }}>📊 Key Metric Queries</h3>
+          {sqlQueries.metric_queries.map((q, i) => (
+            <SqlBlock key={i} title={q.title} description={q.description} sql={adaptSql(q.sql)} />
+          ))}
+        </div>
+      )}
+
+      {/* Monitoring Query */}
+      {sqlQueries.monitoring_query && sqlQueries.monitoring_query.sql && (
+        <div>
+          <h3 style={{ color: "#cbd5e1", fontSize: "15px", fontWeight: "600", margin: "20px 0 12px" }}>🔄 Operational Monitoring</h3>
+          <SqlBlock
+            title={sqlQueries.monitoring_query.title || "Daily Monitoring Query"}
+            description={sqlQueries.monitoring_query.description}
+            sql={adaptSql(sqlQueries.monitoring_query.sql)}
+            defaultOpen={true}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -413,6 +485,14 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(true);
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
+
+  // Keep-alive ping to prevent Render cold starts
+  useEffect(() => {
+    const keepAlive = setInterval(() => {
+      fetch(`${RENDER_URL}/`).catch(() => {});
+    }, 10 * 60 * 1000);
+    return () => clearInterval(keepAlive);
+  }, []);
 
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
@@ -492,55 +572,36 @@ export default function App() {
     setExporting(true);
     try {
       const images = resultsRef.current.querySelectorAll('img');
-      await Promise.all(
-        Array.from(images).map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete) resolve();
-              else { img.onload = resolve; img.onerror = resolve; }
-            })
-        )
-      );
+      await Promise.all(Array.from(images).map((img) => new Promise((resolve) => {
+        if (img.complete) resolve();
+        else { img.onload = resolve; img.onerror = resolve; }
+      })));
       await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const canvas = await html2canvas(resultsRef.current, {
-        scale: 2,
-        backgroundColor: "#1e293b",
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        imageTimeout: 15000,
+        scale: 2, backgroundColor: "#1e293b", useCORS: true, allowTaint: true,
+        logging: false, imageTimeout: 15000,
         onclone: (clonedDoc) => {
-          const clonedImages = clonedDoc.querySelectorAll('img');
-          clonedImages.forEach((img) => {
-            img.style.display = 'block';
-            img.style.visibility = 'visible';
-            img.style.opacity = '1';
+          clonedDoc.querySelectorAll('img').forEach((img) => {
+            img.style.display = 'block'; img.style.visibility = 'visible'; img.style.opacity = '1';
           });
         }
       });
-
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
       let heightLeft = imgHeight;
       let position = 0;
-
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-
       pdf.save("AI_Analysis_Report.pdf");
     } catch (err) {
       console.error("PDF export failed:", err);
@@ -665,7 +726,6 @@ export default function App() {
 
       {result && (
         <div style={styles.dashboardWrap}>
-          {/* Summary bar */}
           <div style={styles.summaryBar}>
             <div style={styles.summaryCard}>
               <div style={styles.summaryVal}>{result.rows?.toLocaleString()}</div>
@@ -688,27 +748,23 @@ export default function App() {
           </div>
 
           <div style={{ ...styles.layout, gridTemplateColumns: chatOpen ? "1fr 320px" : "1fr" }}>
-            {/* Main column */}
             <div style={styles.mainCol} ref={resultsRef}>
               <div style={styles.actionRow}>
                 <button onClick={handleExportPDF} disabled={exporting} style={exporting ? styles.exportButtonDisabled : styles.exportButton}>
                   {exporting ? "⏳ Generating PDF..." : "⬇ Download PDF Report"}
                 </button>
                 {result.model_export && Object.keys(result.model_export).length > 0 && (
-                  <button onClick={handleExportModel} style={styles.exportModelButton}>
-                    📤 Export Model to PWA
-                  </button>
+                  <button onClick={handleExportModel} style={styles.exportModelButton}>📤 Export Model to PWA</button>
                 )}
                 {!chatOpen && (
-                  <button onClick={() => setChatOpen(true)} style={styles.toggleChatButton}>
-                    💬 Open Chat
-                  </button>
+                  <button onClick={() => setChatOpen(true)} style={styles.toggleChatButton}>💬 Open Chat</button>
                 )}
               </div>
 
               <div style={styles.tabs}>
                 <button onClick={() => setActiveTab("overview")} style={activeTab === "overview" ? styles.tabActive : styles.tab}>📊 Overview</button>
                 <button onClick={() => setActiveTab("recommendations")} style={activeTab === "recommendations" ? styles.tabActive : styles.tab}>💡 Recommendations</button>
+                <button onClick={() => setActiveTab("sql")} style={activeTab === "sql" ? styles.tabActive : styles.tab}>🗄️ SQL Queries</button>
               </div>
 
               {activeTab === "overview" && (
@@ -716,7 +772,6 @@ export default function App() {
                   <Collapsible title="Data Quality Report" icon="🔍" defaultOpen={true}>
                     <DataQualityReport report={result.quality_report} />
                   </Collapsible>
-
                   <Collapsible title="Technical Analysis" icon="📈" defaultOpen={true}>
                     {contentBlocks.map((block, i) =>
                       block.type === "text" ? (
@@ -731,7 +786,6 @@ export default function App() {
                     )}
                     <ModelComparisonTable summary={cleanedSummaryText} />
                   </Collapsible>
-
                   <Collapsible title="Confidence Assessment" icon="🎯">
                     <ConfidenceScores scores={result.confidence_scores} />
                   </Collapsible>
@@ -751,16 +805,14 @@ export default function App() {
                       </div>
                     </div>
                   )}
-
                   {result.roi_charts && result.roi_charts.length > 0 && (
-                   <div style={styles.roiChartsSection}>
-                    <h3 style={styles.roiChartsTitle}>📊 Projected Impact</h3>
-                    {result.roi_charts.map((chart, i) => (
-                     <img key={i} src={`data:image/png;base64,${chart}`} alt={`ROI Chart ${i + 1}`} style={styles.chart} />
-                    ))}
-                   </div>
+                    <div style={styles.roiChartsSection}>
+                      <h3 style={styles.roiChartsTitle}>📊 Projected Impact</h3>
+                      {result.roi_charts.map((chart, i) => (
+                        <img key={i} src={`data:image/png;base64,${chart}`} alt={`ROI Chart ${i + 1}`} style={styles.chart} />
+                      ))}
+                    </div>
                   )}
-                  
                   {mainRecommendations && (
                     <Collapsible title="Recommended Initiatives & ROI" icon="💡" defaultOpen={true}
                       badge={<button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>}>
@@ -771,9 +823,12 @@ export default function App() {
                   )}
                 </div>
               )}
+
+              {activeTab === "sql" && (
+                <SqlTab sqlQueries={result.sql_queries} />
+              )}
             </div>
 
-            {/* Chat panel */}
             {chatOpen && (
               <div style={styles.chatPanel}>
                 <div style={styles.chatHeader}>
@@ -836,30 +891,23 @@ const styles = {
   button: { width: "100%", padding: "14px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "pointer", marginTop: "8px" },
   buttonDisabled: { width: "100%", padding: "14px", backgroundColor: "#334155", color: "#94a3b8", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "not-allowed", marginTop: "8px" },
   error: { color: "#f87171", marginTop: "16px", fontSize: "14px" },
-
-  // Dashboard
   dashboardWrap: { width: "100%", maxWidth: "1200px" },
   summaryBar: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" },
   summaryCard: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "16px", textAlign: "center" },
   summaryVal: { fontSize: "24px", fontWeight: "700", color: "#f8fafc" },
   summaryLbl: { fontSize: "12px", color: "#64748b", marginTop: "4px" },
-
   layout: { display: "grid", gap: "16px", alignItems: "start" },
   mainCol: { minWidth: 0 },
-
   actionRow: { display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" },
   exportButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#6366f1", border: "2px solid #6366f1", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
   exportButtonDisabled: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "not-allowed" },
   exportModelButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#4ade80", border: "2px solid #4ade80", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
   toggleChatButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#94a3b8", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer", marginLeft: "auto" },
-
   tabs: { display: "flex", gap: "4px", marginBottom: "16px", borderBottom: "1px solid #334155" },
   tab: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#64748b", borderBottom: "2px solid transparent", marginBottom: "-1px", fontWeight: "500" },
   tabActive: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#f8fafc", borderBottom: "2px solid #6366f1", marginBottom: "-1px", fontWeight: "600" },
-
   markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
   chart: { width: "100%", borderRadius: "8px", marginTop: "8px", marginBottom: "16px", border: "1px solid #334155" },
-
   executiveCard: { marginBottom: "16px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "2px solid #4ade80" },
   executiveHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
   executiveTitle: { color: "#4ade80", fontSize: "18px", marginBottom: "0px", fontWeight: "600" },
@@ -867,8 +915,6 @@ const styles = {
   copyButton: { padding: "4px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
   roiChartsSection: { marginBottom: "16px" },
   roiChartsTitle: { color: "#cbd5e1", fontSize: "15px", fontWeight: "600", marginBottom: "12px" },
-
-  // Chat panel
   chatPanel: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", flexDirection: "column", height: "640px", position: "sticky", top: "20px" },
   chatHeader: { padding: "14px 16px", borderBottom: "1px solid #334155", fontSize: "14px", fontWeight: "600", color: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" },
   chatCloseButton: { background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "16px", padding: "0 4px" },
@@ -882,7 +928,6 @@ const styles = {
   chatInput: { flex: 1, padding: "10px 12px", borderRadius: "8px", border: "1px solid #334155", backgroundColor: "#0f172a", color: "#f8fafc", fontSize: "13px" },
   sendButton: { padding: "10px 16px", backgroundColor: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
   sendButtonDisabled: { padding: "10px 16px", backgroundColor: "#334155", color: "#64748b", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "not-allowed" },
-
   suggestedPrompts: { marginTop: "10px" },
   suggestedLabel: { color: "#64748b", fontSize: "12px", marginBottom: "8px" },
   promptButtons: { display: "flex", flexWrap: "wrap", gap: "8px" },
