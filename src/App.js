@@ -789,6 +789,16 @@ export default function App() {
                   <Collapsible title="Confidence Assessment" icon="🎯">
                     <ConfidenceScores scores={result.confidence_scores} />
                   </Collapsible>
+                  {result.devils_advocate && (
+                   <Collapsible title="Devil's Advocate Review" icon="🔍">
+                    <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic", marginBottom: "12px" }}>
+                     5 challenges to these findings — stress-testing the analysis before you act on it.
+                    </p>
+                    <div style={styles.markdownBody} className="markdownBody">
+                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.devils_advocate}</ReactMarkdown>
+                    </div>
+                   </Collapsible>
+                 )}
                 </div>
               )}
 
