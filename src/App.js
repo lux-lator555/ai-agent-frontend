@@ -679,7 +679,7 @@ export default function App() {
 
         <div style={styles.field}>
           <label style={styles.label}>Upload CSV</label>
-          <input type="file" accept=".csv" onChange={handleFileChange} style={styles.input} />
+          <input type="file" accept=".csv,.xlsx,.xls,.json" onChange={handleFileChange} style={styles.input} />
           {detecting && <p style={styles.detecting}>🔍 Scanning dataset...</p>}
           {detection && (
             <div style={styles.detectionCard}>
