@@ -381,7 +381,6 @@ function SqlTab({ sqlQueries }) {
     switch (dbFlavor) {
       case "sqlserver":
         return sql.replace(/LIMIT (\d+)/gi, "-- Use TOP $1 in SQL Server: SELECT TOP $1 ...")
-                  .replace(/ISNULL\(/gi, "ISNULL(")
                   .replace(/DATE_TRUNC/gi, "DATETRUNC");
       case "mysql":
         return sql.replace(/DECIMAL\(10,2\)/gi, "DOUBLE")
@@ -416,7 +415,6 @@ function SqlTab({ sqlQueries }) {
         💡 These queries are generated based on the analysis performed. Copy them directly into your database client, BI tool, or data pipeline. Adjust table names and schema prefixes as needed for your environment.
       </div>
 
-      {/* Create Table */}
       <Collapsible title="Table Definition" icon="🏗️" defaultOpen={true}
         badge={
           <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(adaptSql(sqlQueries.create_table)); setCopiedCreate(true); setTimeout(() => setCopiedCreate(false), 2000); }} style={sqlStyles.copyBtn}>
@@ -427,7 +425,6 @@ function SqlTab({ sqlQueries }) {
         <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{adaptSql(sqlQueries.create_table)}</code></pre>
       </Collapsible>
 
-      {/* Main Query */}
       {sqlQueries.main_query && (
         <SqlBlock
           title="Main Analysis Query"
@@ -437,7 +434,6 @@ function SqlTab({ sqlQueries }) {
         />
       )}
 
-      {/* Metric Queries */}
       {sqlQueries.metric_queries && sqlQueries.metric_queries.length > 0 && (
         <div>
           <h3 style={{ color: "#cbd5e1", fontSize: "15px", fontWeight: "600", margin: "20px 0 12px" }}>📊 Key Metric Queries</h3>
@@ -447,7 +443,6 @@ function SqlTab({ sqlQueries }) {
         </div>
       )}
 
-      {/* Monitoring Query */}
       {sqlQueries.monitoring_query && sqlQueries.monitoring_query.sql && (
         <div>
           <h3 style={{ color: "#cbd5e1", fontSize: "15px", fontWeight: "600", margin: "20px 0 12px" }}>🔄 Operational Monitoring</h3>
@@ -462,6 +457,169 @@ function SqlTab({ sqlQueries }) {
     </div>
   );
 }
+
+// ---------- VBA Macros Tab ----------
+
+function VbaBlock({ title, description, vba, defaultOpen = false }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(vba);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Collapsible title={title} icon="📊" defaultOpen={defaultOpen}
+      badge={<button onClick={(e) => { e.stopPropagation(); handleCopy(); }} style={sqlStyles.copyBtn}>{copied ? "✅ Copied!" : "Copy VBA"}</button>}>
+      {description && <p style={sqlStyles.description}>{description}</p>}
+      <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vba}</code></pre>
+    </Collapsible>
+  );
+}
+
+function VbaTab({ vbaMacros }) {
+  const [copiedSetup, setCopiedSetup] = useState(false);
+
+  if (!vbaMacros || Object.keys(vbaMacros).length === 0) {
+    return <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic" }}>No VBA macros generated yet. Run an analysis to generate VBA.</p>;
+  }
+
+  return (
+    <div>
+      <div style={sqlStyles.infoBox}>
+        💡 Copy these macros into the Excel VBA editor (Alt+F11 → Insert → Module) to replicate this analysis directly in Excel. Update cell references and sheet names to match your workbook.
+      </div>
+
+      {vbaMacros.workbook_setup && (
+        <Collapsible title="Workbook Setup" icon="🏗️" defaultOpen={true}
+          badge={
+            <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(vbaMacros.workbook_setup); setCopiedSetup(true); setTimeout(() => setCopiedSetup(false), 2000); }} style={sqlStyles.copyBtn}>
+              {copiedSetup ? "✅ Copied!" : "Copy VBA"}
+            </button>
+          }>
+          <p style={sqlStyles.description}>Run this first to set up sheet names, headers, and formatting.</p>
+          <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vbaMacros.workbook_setup}</code></pre>
+        </Collapsible>
+      )}
+
+      {vbaMacros.kpi_dashboard_macro && vbaMacros.kpi_dashboard_macro.vba && (
+        <VbaBlock title={vbaMacros.kpi_dashboard_macro.title || "KPI Dashboard Macro"}
+          description={vbaMacros.kpi_dashboard_macro.description}
+          vba={vbaMacros.kpi_dashboard_macro.vba} defaultOpen={true} />
+      )}
+
+      {vbaMacros.anomaly_flagging_macro && vbaMacros.anomaly_flagging_macro.vba && (
+        <VbaBlock title={vbaMacros.anomaly_flagging_macro.title || "Anomaly Flagging Macro"}
+          description={vbaMacros.anomaly_flagging_macro.description}
+          vba={vbaMacros.anomaly_flagging_macro.vba} />
+      )}
+
+      {vbaMacros.chart_macro && vbaMacros.chart_macro.vba && (
+        <VbaBlock title={vbaMacros.chart_macro.title || "Chart Generation Macro"}
+          description={vbaMacros.chart_macro.description}
+          vba={vbaMacros.chart_macro.vba} />
+      )}
+
+      {vbaMacros.refresh_macro && vbaMacros.refresh_macro.vba && (
+        <VbaBlock title={vbaMacros.refresh_macro.title || "Data Refresh Macro"}
+          description={vbaMacros.refresh_macro.description}
+          vba={vbaMacros.refresh_macro.vba} />
+      )}
+    </div>
+  );
+}
+
+// ---------- Board Deck Tab ----------
+
+function BoardDeckTab({ boardDeck }) {
+  if (!boardDeck || !boardDeck.slide1) {
+    return <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic" }}>No board deck generated yet. Run an analysis to generate one.</p>;
+  }
+
+  const { slide1, slide2, slide3 } = boardDeck;
+
+  return (
+    <div style={deckStyles.wrap}>
+      <div style={deckStyles.infoBox}>
+        💡 A 60-second board-ready summary. Screenshot each slide directly into a presentation.
+      </div>
+
+      <div style={deckStyles.slide}>
+        <div style={deckStyles.slideLabel}>Slide 1 of 3 — the finding</div>
+        <div style={deckStyles.headline}>{slide1.headline}</div>
+        <div style={deckStyles.metricRow}>
+          {slide1.metrics && slide1.metrics.map((m, i) => (
+            <div key={i} style={deckStyles.metricCard}>
+              <div style={deckStyles.metricVal}>{m.val}</div>
+              <div style={deckStyles.metricLbl}>{m.lbl}</div>
+            </div>
+          ))}
+        </div>
+        {slide1.chart && (
+          <img src={`data:image/png;base64,${slide1.chart}`} alt="Slide 1 chart" style={deckStyles.chartImg} />
+        )}
+      </div>
+
+      <div style={deckStyles.slide}>
+        <div style={deckStyles.slideLabel}>Slide 2 of 3 — the recommendation</div>
+        <div style={deckStyles.headline}>{slide2.headline}</div>
+        <div style={deckStyles.recList}>
+          {slide2.recommendations && slide2.recommendations.map((r, i) => (
+            <div key={i} style={deckStyles.recItem}>
+              <div style={deckStyles.recNum}>{i + 1}</div>
+              <div style={deckStyles.recText}>{r.text}</div>
+              <div style={deckStyles.recImpact}>{r.impact}</div>
+            </div>
+          ))}
+        </div>
+        <div style={deckStyles.askBanner}>🎯 {slide2.ask}</div>
+      </div>
+
+      <div style={deckStyles.slide}>
+        <div style={deckStyles.slideLabel}>Slide 3 of 3 — the range of outcomes</div>
+        <div style={deckStyles.headline}>{slide3.headline}</div>
+        <div style={deckStyles.scenarioRow}>
+          {slide3.scenarios && slide3.scenarios.map((s, i) => (
+            <div key={i} style={{
+              ...deckStyles.scenarioCard,
+              ...(i === 1 ? deckStyles.scenarioCardHighlight : {})
+            }}>
+              <div style={{ ...deckStyles.scenarioLabel, color: i === 1 ? "#4ade80" : "#94a3b8" }}>{s.label}</div>
+              <div style={{ ...deckStyles.scenarioVal, color: i === 1 ? "#4ade80" : "#f8fafc" }}>{s.val}</div>
+              <div style={deckStyles.scenarioSub}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const deckStyles = {
+  wrap: { display: "flex", flexDirection: "column", gap: "16px" },
+  infoBox: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "#64748b" },
+  slide: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "24px 28px" },
+  slideLabel: { fontSize: "12px", color: "#64748b", marginBottom: "10px" },
+  headline: { fontSize: "19px", fontWeight: "600", color: "#f8fafc", marginBottom: "18px", lineHeight: "1.4" },
+  metricRow: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "16px" },
+  metricCard: { backgroundColor: "#1e293b", borderRadius: "8px", padding: "14px", textAlign: "center" },
+  metricVal: { fontSize: "22px", fontWeight: "700", color: "#f8fafc" },
+  metricLbl: { fontSize: "12px", color: "#94a3b8", marginTop: "4px" },
+  chartImg: { width: "100%", borderRadius: "8px", marginTop: "8px" },
+  recList: { display: "flex", flexDirection: "column", gap: "10px" },
+  recItem: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", backgroundColor: "#1e293b", borderRadius: "8px" },
+  recNum: { width: "24px", height: "24px", borderRadius: "50%", backgroundColor: "#1e3a5f", color: "#93c5fd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "600", flexShrink: 0 },
+  recText: { fontSize: "14px", color: "#f8fafc", flex: 1 },
+  recImpact: { fontSize: "13px", fontWeight: "600", color: "#4ade80", whiteSpace: "nowrap" },
+  askBanner: { marginTop: "16px", padding: "14px 16px", backgroundColor: "#1e3a5f", borderRadius: "8px", fontSize: "13px", color: "#93c5fd" },
+  scenarioRow: { display: "flex", gap: "12px" },
+  scenarioCard: { flex: 1, borderRadius: "12px", padding: "18px 14px", textAlign: "center", backgroundColor: "#1e293b", border: "1px solid #334155" },
+  scenarioCardHighlight: { border: "2px solid #4ade80" },
+  scenarioLabel: { fontSize: "12px", marginBottom: "8px" },
+  scenarioVal: { fontSize: "24px", fontWeight: "700" },
+  scenarioSub: { fontSize: "11px", color: "#64748b", marginTop: "6px" },
+};
 
 // ---------- Main App ----------
 
@@ -486,7 +644,6 @@ export default function App() {
   const resultsRef = useRef(null);
   const chatBottomRef = useRef(null);
 
-  // Keep-alive ping to prevent Render cold starts
   useEffect(() => {
     const keepAlive = setInterval(() => {
       fetch(`${RENDER_URL}/`).catch(() => {});
@@ -678,7 +835,7 @@ export default function App() {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>Upload CSV</label>
+          <label style={styles.label}>Upload File</label>
           <input type="file" accept=".csv,.xlsx,.xls,.json,.pdf" onChange={handleFileChange} style={styles.input} />
           {detecting && <p style={styles.detecting}>🔍 Scanning dataset...</p>}
           {detection && (
@@ -766,6 +923,7 @@ export default function App() {
                 <button onClick={() => setActiveTab("recommendations")} style={activeTab === "recommendations" ? styles.tabActive : styles.tab}>💡 Recommendations</button>
                 <button onClick={() => setActiveTab("sql")} style={activeTab === "sql" ? styles.tabActive : styles.tab}>🗄️ SQL Queries</button>
                 <button onClick={() => setActiveTab("vba")} style={activeTab === "vba" ? styles.tabActive : styles.tab}>📗 Excel / VBA</button>
+                <button onClick={() => setActiveTab("deck")} style={activeTab === "deck" ? styles.tabActive : styles.tab}>🎯 Board Deck</button>
               </div>
 
               {activeTab === "overview" && (
@@ -791,15 +949,15 @@ export default function App() {
                     <ConfidenceScores scores={result.confidence_scores} />
                   </Collapsible>
                   {result.devils_advocate && (
-                   <Collapsible title="Devil's Advocate Review" icon="🔍">
-                    <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic", marginBottom: "12px" }}>
-                     5 challenges to these findings — stress-testing the analysis before you act on it.
-                    </p>
-                    <div style={styles.markdownBody} className="markdownBody">
-                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.devils_advocate}</ReactMarkdown>
-                    </div>
-                   </Collapsible>
-                 )}
+                    <Collapsible title="Devil's Advocate Review" icon="🔍">
+                      <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic", marginBottom: "12px" }}>
+                        5 challenges to these findings — stress-testing the analysis before you act on it.
+                      </p>
+                      <div style={styles.markdownBody} className="markdownBody">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.devils_advocate}</ReactMarkdown>
+                      </div>
+                    </Collapsible>
+                  )}
                 </div>
               )}
 
@@ -841,8 +999,11 @@ export default function App() {
 
               {activeTab === "vba" && (
                 <VbaTab vbaMacros={result.vba_macros} />
-             )}
+              )}
 
+              {activeTab === "deck" && (
+                <BoardDeckTab boardDeck={result.board_deck} />
+              )}
             </div>
 
             {chatOpen && (
@@ -884,78 +1045,6 @@ export default function App() {
   );
 }
 
-// ---------- VBA Macros Tab ----------
-
-function VbaBlock({ title, description, vba, defaultOpen = false }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(vba);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <Collapsible title={title} icon="📊" defaultOpen={defaultOpen}
-      badge={<button onClick={(e) => { e.stopPropagation(); handleCopy(); }} style={sqlStyles.copyBtn}>{copied ? "✅ Copied!" : "Copy VBA"}</button>}>
-      {description && <p style={sqlStyles.description}>{description}</p>}
-      <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vba}</code></pre>
-    </Collapsible>
-  );
-}
-
-function VbaTab({ vbaMacros }) {
-  const [copiedSetup, setCopiedSetup] = useState(false);
-
-  if (!vbaMacros || Object.keys(vbaMacros).length === 0) {
-    return <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic" }}>No VBA macros generated yet. Run an analysis to generate VBA.</p>;
-  }
-
-  return (
-    <div>
-      <div style={sqlStyles.infoBox}>
-        💡 Copy these macros into the Excel VBA editor (Alt+F11 → Insert → Module) to replicate this analysis directly in Excel. Update cell references and sheet names to match your workbook.
-      </div>
-
-      {vbaMacros.workbook_setup && (
-        <Collapsible title="Workbook Setup" icon="🏗️" defaultOpen={true}
-          badge={
-            <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(vbaMacros.workbook_setup); setCopiedSetup(true); setTimeout(() => setCopiedSetup(false), 2000); }} style={sqlStyles.copyBtn}>
-              {copiedSetup ? "✅ Copied!" : "Copy VBA"}
-            </button>
-          }>
-          <p style={sqlStyles.description}>Run this first to set up sheet names, headers, and formatting.</p>
-          <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vbaMacros.workbook_setup}</code></pre>
-        </Collapsible>
-      )}
-
-      {vbaMacros.kpi_dashboard_macro && vbaMacros.kpi_dashboard_macro.vba && (
-        <VbaBlock title={vbaMacros.kpi_dashboard_macro.title || "KPI Dashboard Macro"}
-          description={vbaMacros.kpi_dashboard_macro.description}
-          vba={vbaMacros.kpi_dashboard_macro.vba} defaultOpen={true} />
-      )}
-
-      {vbaMacros.anomaly_flagging_macro && vbaMacros.anomaly_flagging_macro.vba && (
-        <VbaBlock title={vbaMacros.anomaly_flagging_macro.title || "Anomaly Flagging Macro"}
-          description={vbaMacros.anomaly_flagging_macro.description}
-          vba={vbaMacros.anomaly_flagging_macro.vba} />
-      )}
-
-      {vbaMacros.chart_macro && vbaMacros.chart_macro.vba && (
-        <VbaBlock title={vbaMacros.chart_macro.title || "Chart Generation Macro"}
-          description={vbaMacros.chart_macro.description}
-          vba={vbaMacros.chart_macro.vba} />
-      )}
-
-      {vbaMacros.refresh_macro && vbaMacros.refresh_macro.vba && (
-        <VbaBlock title={vbaMacros.refresh_macro.title || "Data Refresh Macro"}
-          description={vbaMacros.refresh_macro.description}
-          vba={vbaMacros.refresh_macro.vba} />
-      )}
-    </div>
-  );
-}
-
 const styles = {
   page: { minHeight: "100vh", backgroundColor: "#0f172a", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", fontFamily: "'Segoe UI', sans-serif" },
   outerCard: { backgroundColor: "#1e293b", borderRadius: "16px", padding: "40px", width: "100%", maxWidth: "900px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", marginBottom: "24px" },
@@ -991,9 +1080,9 @@ const styles = {
   exportButtonDisabled: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#334155", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "not-allowed" },
   exportModelButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#4ade80", border: "2px solid #4ade80", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer" },
   toggleChatButton: { padding: "12px 16px", backgroundColor: "#0f172a", color: "#94a3b8", border: "2px solid #334155", borderRadius: "8px", fontSize: "13px", fontWeight: "600", cursor: "pointer", marginLeft: "auto" },
-  tabs: { display: "flex", gap: "4px", marginBottom: "16px", borderBottom: "1px solid #334155" },
-  tab: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#64748b", borderBottom: "2px solid transparent", marginBottom: "-1px", fontWeight: "500" },
-  tabActive: { padding: "10px 18px", fontSize: "14px", cursor: "pointer", border: "none", background: "none", color: "#f8fafc", borderBottom: "2px solid #6366f1", marginBottom: "-1px", fontWeight: "600" },
+  tabs: { display: "flex", gap: "4px", marginBottom: "16px", borderBottom: "1px solid #334155", flexWrap: "wrap" },
+  tab: { padding: "10px 16px", fontSize: "13px", cursor: "pointer", border: "none", background: "none", color: "#64748b", borderBottom: "2px solid transparent", marginBottom: "-1px", fontWeight: "500" },
+  tabActive: { padding: "10px 16px", fontSize: "13px", cursor: "pointer", border: "none", background: "none", color: "#f8fafc", borderBottom: "2px solid #6366f1", marginBottom: "-1px", fontWeight: "600" },
   markdownBody: { color: "#94a3b8", fontSize: "14px", lineHeight: "1.8" },
   chart: { width: "100%", borderRadius: "8px", marginTop: "8px", marginBottom: "16px", border: "1px solid #334155" },
   executiveCard: { marginBottom: "16px", backgroundColor: "#0f172a", borderRadius: "12px", padding: "24px", border: "2px solid #4ade80" },
