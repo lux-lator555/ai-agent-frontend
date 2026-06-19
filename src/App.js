@@ -765,6 +765,7 @@ export default function App() {
                 <button onClick={() => setActiveTab("overview")} style={activeTab === "overview" ? styles.tabActive : styles.tab}>📊 Overview</button>
                 <button onClick={() => setActiveTab("recommendations")} style={activeTab === "recommendations" ? styles.tabActive : styles.tab}>💡 Recommendations</button>
                 <button onClick={() => setActiveTab("sql")} style={activeTab === "sql" ? styles.tabActive : styles.tab}>🗄️ SQL Queries</button>
+                <button onClick={() => setActiveTab("vba")} style={activeTab === "vba" ? styles.tabActive : styles.tab}>📗 Excel / VBA</button>
               </div>
 
               {activeTab === "overview" && (
@@ -837,6 +838,11 @@ export default function App() {
               {activeTab === "sql" && (
                 <SqlTab sqlQueries={result.sql_queries} />
               )}
+
+              {activeTab === "vba" && (
+                <VbaTab vbaMacros={result.vba_macros} />
+             )}
+
             </div>
 
             {chatOpen && (
@@ -873,6 +879,78 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- VBA Macros Tab ----------
+
+function VbaBlock({ title, description, vba, defaultOpen = false }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(vba);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Collapsible title={title} icon="📊" defaultOpen={defaultOpen}
+      badge={<button onClick={(e) => { e.stopPropagation(); handleCopy(); }} style={sqlStyles.copyBtn}>{copied ? "✅ Copied!" : "Copy VBA"}</button>}>
+      {description && <p style={sqlStyles.description}>{description}</p>}
+      <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vba}</code></pre>
+    </Collapsible>
+  );
+}
+
+function VbaTab({ vbaMacros }) {
+  const [copiedSetup, setCopiedSetup] = useState(false);
+
+  if (!vbaMacros || Object.keys(vbaMacros).length === 0) {
+    return <p style={{ color: "#64748b", fontSize: "13px", fontStyle: "italic" }}>No VBA macros generated yet. Run an analysis to generate VBA.</p>;
+  }
+
+  return (
+    <div>
+      <div style={sqlStyles.infoBox}>
+        💡 Copy these macros into the Excel VBA editor (Alt+F11 → Insert → Module) to replicate this analysis directly in Excel. Update cell references and sheet names to match your workbook.
+      </div>
+
+      {vbaMacros.workbook_setup && (
+        <Collapsible title="Workbook Setup" icon="🏗️" defaultOpen={true}
+          badge={
+            <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(vbaMacros.workbook_setup); setCopiedSetup(true); setTimeout(() => setCopiedSetup(false), 2000); }} style={sqlStyles.copyBtn}>
+              {copiedSetup ? "✅ Copied!" : "Copy VBA"}
+            </button>
+          }>
+          <p style={sqlStyles.description}>Run this first to set up sheet names, headers, and formatting.</p>
+          <pre style={sqlStyles.pre}><code style={sqlStyles.code}>{vbaMacros.workbook_setup}</code></pre>
+        </Collapsible>
+      )}
+
+      {vbaMacros.kpi_dashboard_macro && vbaMacros.kpi_dashboard_macro.vba && (
+        <VbaBlock title={vbaMacros.kpi_dashboard_macro.title || "KPI Dashboard Macro"}
+          description={vbaMacros.kpi_dashboard_macro.description}
+          vba={vbaMacros.kpi_dashboard_macro.vba} defaultOpen={true} />
+      )}
+
+      {vbaMacros.anomaly_flagging_macro && vbaMacros.anomaly_flagging_macro.vba && (
+        <VbaBlock title={vbaMacros.anomaly_flagging_macro.title || "Anomaly Flagging Macro"}
+          description={vbaMacros.anomaly_flagging_macro.description}
+          vba={vbaMacros.anomaly_flagging_macro.vba} />
+      )}
+
+      {vbaMacros.chart_macro && vbaMacros.chart_macro.vba && (
+        <VbaBlock title={vbaMacros.chart_macro.title || "Chart Generation Macro"}
+          description={vbaMacros.chart_macro.description}
+          vba={vbaMacros.chart_macro.vba} />
+      )}
+
+      {vbaMacros.refresh_macro && vbaMacros.refresh_macro.vba && (
+        <VbaBlock title={vbaMacros.refresh_macro.title || "Data Refresh Macro"}
+          description={vbaMacros.refresh_macro.description}
+          vba={vbaMacros.refresh_macro.vba} />
       )}
     </div>
   );
