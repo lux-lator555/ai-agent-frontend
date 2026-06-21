@@ -982,6 +982,37 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                  {result.monte_carlo && result.monte_carlo.chart && (
+                    <div style={styles.monteCarloSection}>
+                      <h3 style={styles.roiChartsTitle}>🎲 Monte Carlo Simulation</h3>
+                      <p style={{ color: "#64748b", fontSize: "13px", marginBottom: "12px" }}>
+                        {result.monte_carlo.n_runs?.toLocaleString()} simulated outcomes modeling uncertainty in the projected impact.
+                      </p>
+                      <div style={styles.monteCarloStats}>
+                        <div style={styles.mcStat}>
+                          <div style={styles.mcStatVal}>${result.monte_carlo.p5?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                          <div style={styles.mcStatLbl}>5th percentile (pessimistic)</div>
+                        </div>
+                        <div style={{ ...styles.mcStat, ...styles.mcStatHighlight }}>
+                          <div style={{ ...styles.mcStatVal, color: "#4ade80" }}>${result.monte_carlo.p50?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                          <div style={styles.mcStatLbl}>Median (most likely)</div>
+                        </div>
+                        <div style={styles.mcStat}>
+                          <div style={styles.mcStatVal}>${result.monte_carlo.p95?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                          <div style={styles.mcStatLbl}>95th percentile (optimistic)</div>
+                        </div>
+                      </div>
+                      <div style={styles.mcProbBox}>
+                        <p style={styles.mcProbText}>
+                          🎯 <strong>{result.monte_carlo.prob_exceed_base_pct}%</strong> probability of meeting or exceeding the base case estimate
+                        </p>
+                        <p style={styles.mcProbText}>
+                          ✅ <strong>{result.monte_carlo.prob_exceed_low_pct}%</strong> probability of exceeding the conservative estimate
+                        </p>
+                      </div>
+                    <img src={`data:image/png;base64,${result.monte_carlo.chart}`} alt="Monte Carlo simulation histogram" style={styles.chart} />
+                  </div>
+                )}
                   {mainRecommendations && (
                     <Collapsible title="Recommended Initiatives & ROI" icon="💡" defaultOpen={true}
                       badge={<button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>}>
@@ -1092,6 +1123,14 @@ const styles = {
   copyButton: { padding: "4px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
   roiChartsSection: { marginBottom: "16px" },
   roiChartsTitle: { color: "#cbd5e1", fontSize: "15px", fontWeight: "600", marginBottom: "12px" },
+  monteCarloSection: { marginBottom: "16px", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "20px" },
+  monteCarloStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "16px" },
+  mcStat: { backgroundColor: "#1e293b", borderRadius: "8px", padding: "14px", textAlign: "center", border: "1px solid #334155" },
+  mcStatHighlight: { border: "2px solid #4ade80" },
+  mcStatVal: { fontSize: "20px", fontWeight: "700", color: "#f8fafc" },
+  mcStatLbl: { fontSize: "11px", color: "#94a3b8", marginTop: "4px" },
+  mcProbBox: { backgroundColor: "#1e3a5f", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px" },
+  mcProbText: { fontSize: "13px", color: "#93c5fd", margin: "4px 0" },
   chatPanel: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", flexDirection: "column", height: "640px", position: "sticky", top: "20px" },
   chatHeader: { padding: "14px 16px", borderBottom: "1px solid #334155", fontSize: "14px", fontWeight: "600", color: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" },
   chatCloseButton: { background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "16px", padding: "0 4px" },
