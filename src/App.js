@@ -792,9 +792,15 @@ export default function App() {
   };
 
   const cleanSummary = (text) => {
-    if (!text) return "";
-    return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
-  };
+  if (!text) return "";
+  return text
+    .replace(/```python[\s\S]*?```/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/Charts Generated:[\s\S]*$/i, "")
+    .replace(/Generated Charts:[\s\S]*$/i, "")
+    .replace(/The following charts were generated:[\s\S]*$/i, "")
+    .trim();
+};
 
   const mainRecommendations = result?.recommendations
     ? extractSection(result.recommendations, null, "Executive Summary")
