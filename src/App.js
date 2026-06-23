@@ -625,6 +625,8 @@ const deckStyles = {
 
 export default function App() {
   const [file, setFile] = useState(null);
+  const [file2, setFile2] = useState(null);
+  const [compareMode, setCompareMode] = useState(false);
   const [goal, setGoal] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
@@ -687,6 +689,9 @@ export default function App() {
     formData.append("file", file);
     formData.append("goal", goal);
     formData.append("api_key", apiKey);
+    if (compareMode && file2) {
+      formData.append("file2", file2);
+    }
     try {
       const response = await fetch(`${RENDER_URL}/analyze`, { method: "POST", body: formData });
       if (!response.ok) throw new Error("Server error — please try again.");
@@ -792,15 +797,9 @@ export default function App() {
   };
 
   const cleanSummary = (text) => {
-  if (!text) return "";
-  return text
-    .replace(/```python[\s\S]*?```/g, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/Charts Generated:[\s\S]*$/i, "")
-    .replace(/Generated Charts:[\s\S]*$/i, "")
-    .replace(/The following charts were generated:[\s\S]*$/i, "")
-    .trim();
-};
+    if (!text) return "";
+    return text.replace(/```python[\s\S]*?```/g, "").replace(/```[\s\S]*?```/g, "").trim();
+  };
 
   const mainRecommendations = result?.recommendations
     ? extractSection(result.recommendations, null, "Executive Summary")
@@ -843,6 +842,17 @@ export default function App() {
         <div style={styles.field}>
           <label style={styles.label}>Upload File</label>
           <input type="file" accept=".csv,.xlsx,.xls,.json,.pdf" onChange={handleFileChange} style={styles.input} />
+          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <input type="checkbox" id="compareMode" checked={compareMode} onChange={e => { setCompareMode(e.target.checked); if (!e.target.checked) setFile2(null); }} />
+            <label htmlFor="compareMode" style={{ color: "#94a3b8", fontSize: "13px", cursor: "pointer" }}>Compare with a second dataset</label>
+          </div>
+          {compareMode && (
+            <div style={{ marginTop: "10px" }}>
+              <label style={{ ...styles.label, color: "#6366f1" }}>Second File (for comparison)</label>
+              <input type="file" accept=".csv,.xlsx,.xls,.json,.pdf" onChange={e => setFile2(e.target.files[0])} style={styles.input} />
+              {file2 && <p style={{ color: "#4ade80", fontSize: "12px", marginTop: "6px" }}>✓ {file2.name} ready for comparison</p>}
+            </div>
+          )}
           {detecting && <p style={styles.detecting}>🔍 Scanning dataset...</p>}
           {detection && (
             <div style={styles.detectionCard}>
@@ -869,10 +879,11 @@ export default function App() {
                 "Run statistical hypothesis tests on this dataset. Check normality of key variables, compare groups using appropriate tests (t-test or Mann-Whitney), test correlations between variables, and generate box plots and a correlation heatmap. State the null hypothesis, p-value, and conclusion for each test in plain English.",
                 "Run RFM analysis on this customer transaction dataset. Calculate Recency, Frequency, and Monetary scores for each customer. Segment customers into groups like Champions, Loyal Customers, At Risk, Lost, and New Customers. Generate a bar chart of customer counts per segment and a scatter plot of Recency vs Frequency colored by segment. Recommend marketing actions for each segment.",
                 "Run cohort retention analysis on this dataset. Group customers into cohorts based on their signup date month. For each cohort, calculate the retention rate for each subsequent month. Generate a cohort retention heatmap. Determine whether newer cohorts retain better or worse than older cohorts and explain what this means for the business.",
-                "Perform a Six Sigma and Lean analysis on this operational dataset. The key process metric is dwell_time_hours with a target of 2.5 hours. FIRST generate these 3 mandatory charts in a single code block: (1) a control chart of dwell_time_hours over time with UCL and LCL lines marked in red and data points outside limits colored red, (2) a Pareto chart of defect_category sorted by frequency with cumulative % line, (3) a SHAP feature importance bar chart showing top drivers of dwell time. THEN in a second code block calculate: mean, std dev, UCL, LCL, DPMO, and sigma level. THEN write the DMAIC summary with baseline sigma level, top root causes from Pareto and SHAP, recommended improvements, projected sigma level, and financial impact assuming each excess dwell hour costs $85."
+                "Perform a Six Sigma and Lean analysis on this operational dataset. The key process metric is dwell_time_hours with a target of 2.5 hours. FIRST generate these 3 mandatory charts in a single code block: (1) a control chart of dwell_time_hours over time with UCL and LCL lines marked in red and data points outside limits colored red, (2) a Pareto chart of defect_category sorted by frequency with cumulative % line, (3) a SHAP feature importance bar chart showing top drivers of dwell time. THEN in a second code block calculate: mean, std dev, UCL, LCL, DPMO, and sigma level. THEN write the DMAIC summary with baseline sigma level, top root causes from Pareto and SHAP, recommended improvements, projected sigma level, and financial impact assuming each excess dwell hour costs $85.",
+                "Compare these two datasets. Run KS tests on all matching numeric columns to identify which features have drifted significantly. Generate side-by-side distribution plots for the top 3 most drifted features. For categorical columns compare value distributions and flag new or missing categories. Calculate an overall drift score as the percentage of features that have significantly drifted. Run statistical significance tests on key metric differences. If the datasets represent time periods, frame this as a before/after analysis and calculate the % change in key metrics. Provide a business interpretation of what the drift or differences mean, whether a model should be retrained, and quantify the financial impact of any significant changes."
               ].map((prompt, i) => (
-                <button key={i} onClick={() => setGoal(prompt)} style={styles.promptButton}>
-                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests", "🏆 RFM Analysis", "📅 Cohort Analysis", "⚙️ Six Sigma / Lean"][i]}
+                <button key={i} onClick={() => { setGoal(prompt); if (i === 10) setCompareMode(true); }} style={styles.promptButton}>
+                  {["🔄 Churn Prediction", "💰 Salary Prediction", "👥 Customer Segmentation", "🚚 Shipment Delay", "🚨 Anomaly Detection", "📈 Trend Analysis", "🔬 Statistical Tests", "🏆 RFM Analysis", "📅 Cohort Analysis", "⚙️ Six Sigma / Lean", "📊 Compare Datasets"][i]}
                 </button>
               ))}
             </div>
@@ -988,37 +999,6 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  {result.monte_carlo && result.monte_carlo.chart && (
-                    <div style={styles.monteCarloSection}>
-                      <h3 style={styles.roiChartsTitle}>🎲 Monte Carlo Simulation</h3>
-                      <p style={{ color: "#64748b", fontSize: "13px", marginBottom: "12px" }}>
-                        {result.monte_carlo.n_runs?.toLocaleString()} simulated outcomes modeling uncertainty in the projected impact.
-                      </p>
-                      <div style={styles.monteCarloStats}>
-                        <div style={styles.mcStat}>
-                          <div style={styles.mcStatVal}>${result.monte_carlo.p5?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                          <div style={styles.mcStatLbl}>5th percentile (pessimistic)</div>
-                        </div>
-                        <div style={{ ...styles.mcStat, ...styles.mcStatHighlight }}>
-                          <div style={{ ...styles.mcStatVal, color: "#4ade80" }}>${result.monte_carlo.p50?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                          <div style={styles.mcStatLbl}>Median (most likely)</div>
-                        </div>
-                        <div style={styles.mcStat}>
-                          <div style={styles.mcStatVal}>${result.monte_carlo.p95?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                          <div style={styles.mcStatLbl}>95th percentile (optimistic)</div>
-                        </div>
-                      </div>
-                      <div style={styles.mcProbBox}>
-                        <p style={styles.mcProbText}>
-                          🎯 <strong>{result.monte_carlo.prob_exceed_base_pct}%</strong> probability of meeting or exceeding the base case estimate
-                        </p>
-                        <p style={styles.mcProbText}>
-                          ✅ <strong>{result.monte_carlo.prob_exceed_low_pct}%</strong> probability of exceeding the conservative estimate
-                        </p>
-                      </div>
-                    <img src={`data:image/png;base64,${result.monte_carlo.chart}`} alt="Monte Carlo simulation histogram" style={styles.chart} />
-                  </div>
-                )}
                   {mainRecommendations && (
                     <Collapsible title="Recommended Initiatives & ROI" icon="💡" defaultOpen={true}
                       badge={<button onClick={handleCopy} style={styles.copyButton}>{copySuccess ? "✅ Copied!" : "📋 Copy"}</button>}>
@@ -1129,14 +1109,6 @@ const styles = {
   copyButton: { padding: "4px 10px", backgroundColor: "#1e293b", color: "#6366f1", border: "1px solid #6366f1", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: "500" },
   roiChartsSection: { marginBottom: "16px" },
   roiChartsTitle: { color: "#cbd5e1", fontSize: "15px", fontWeight: "600", marginBottom: "12px" },
-  monteCarloSection: { marginBottom: "16px", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "20px" },
-  monteCarloStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "16px" },
-  mcStat: { backgroundColor: "#1e293b", borderRadius: "8px", padding: "14px", textAlign: "center", border: "1px solid #334155" },
-  mcStatHighlight: { border: "2px solid #4ade80" },
-  mcStatVal: { fontSize: "20px", fontWeight: "700", color: "#f8fafc" },
-  mcStatLbl: { fontSize: "11px", color: "#94a3b8", marginTop: "4px" },
-  mcProbBox: { backgroundColor: "#1e3a5f", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px" },
-  mcProbText: { fontSize: "13px", color: "#93c5fd", margin: "4px 0" },
   chatPanel: { backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", flexDirection: "column", height: "640px", position: "sticky", top: "20px" },
   chatHeader: { padding: "14px 16px", borderBottom: "1px solid #334155", fontSize: "14px", fontWeight: "600", color: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" },
   chatCloseButton: { background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "16px", padding: "0 4px" },
